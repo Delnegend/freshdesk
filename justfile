@@ -6,6 +6,7 @@ check:
     cargo fmt --check
     cargo clippy --all-targets -- -D warnings
     cargo test --test client_tests
+    bun install --frozen-lockfile
     bun x tsc --noEmit
 
 # Format all code

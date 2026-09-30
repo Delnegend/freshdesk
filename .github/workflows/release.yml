@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Tag & Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Next version (Conventional Commits)
+        id: semver
+        uses: ietf-tools/semver-action@v1
+        with:
+          token: ${{ github.token }}
+          fallbackTag: v0.0.0
+          noNewCommitBehavior: silent
+          noVersionBumpBehavior: patch
+
+      - name: Setup Rust toolchain
+        if: steps.semver.outputs.bump != 'none'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        if: steps.semver.outputs.bump != 'none'
+        run: |
+          cargo build --release --bin freshdesk
+          mkdir -p dist
+          tar -czvf dist/freshdesk-linux-x64.tar.gz -C target/release freshdesk
+
+      - name: Publish Release
+        if: steps.semver.outputs.bump != 'none'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.semver.outputs.next }}
+          files: dist/freshdesk-linux-x64.tar.gz
+          generate_release_notes: true

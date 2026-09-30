@@ -1,0 +1,9 @@
+/target
+/node_modules
+.env
+*.xlsx
+.freshdesk_session.json
+/tmp
+*.flac
+*.wav
+*.mp3

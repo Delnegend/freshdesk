@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -30,7 +30,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Setup Just
-        uses: extractions/setup-just@v2
+        uses: extractions/setup-just@v4
 
       - name: Run verification
         run: just check

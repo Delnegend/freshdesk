@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Freshdesk Rust Client Team"]
 description = "Freshdesk API client and CLI written in Rust"
+license = "MIT"
 
 [dependencies]
 tokio = { version = "1.53.1", features = ["macros", "rt-multi-thread", "fs", "process"] }

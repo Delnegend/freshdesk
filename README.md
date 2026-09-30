@@ -166,3 +166,7 @@ cargo test --test client_tests
 # Live integration tests against the configured Freshdesk instance
 cargo test --test live_tests -- --nocapture
 ```
+
+# LICENSE
+
+MIT

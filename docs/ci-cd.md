@@ -55,7 +55,8 @@ This repository implements the `autonomous-upgrade` workflow architecture for de
 ## 2. Dependabot Configuration (`.github/dependabot.yml`)
 
 - Runs daily at `02:00 UTC`.
-- Covers `cargo`, `npm`, and `github-actions`.
+- Covers `cargo` and `github-actions`.
+- Does **not** cover `bun`: Dependabot's `bun` updater image ships Bun 1.3.x, which cannot parse the `lockfileVersion: 2` lockfile that Bun 1.4+ writes, so every run fails with `Unsupported bun.lock 'lockfileVersion' 2`. This is blocked upstream on [dependabot-core#15897](https://github.com/dependabot/dependabot-core/issues/15897) (per-repository Bun versions in the updater image). Re-add the ecosystem in one line once that ships. See [dependabot-core#15848](https://github.com/dependabot/dependabot-core/issues/15848) for the original silent-lockfile-downgrade report.
 - Enforces `cooldown: default-days: 14` to quarantine newly published dependency versions for two weeks against supply-chain attacks (account takeovers, poisoned point-releases).
 - Isolates `patch-and-minor` updates from `major` breaking changes.
 

@@ -1,5 +1,5 @@
 use rust_xlsxwriter::{Color, Format, FormatAlign, FormatBorder, Workbook};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::path::Path;
 use tracing::info;
@@ -84,8 +84,37 @@ impl Quarter {
     }
 }
 
-/// Products that are marked "In Charge" (checked = true) by default.
-let defaults: &[&str] = &[];
+/// Parses a comma-separated product list from an environment variable into a
+/// lowercased set for case-insensitive lookup. Returns `None` when the variable
+/// is unset, empty, or contains only separators.
+pub fn product_set_from_env(key: &str) -> Option<HashSet<String>> {
+    let raw = std::env::var(key).ok()?;
+    let set: HashSet<String> = raw
+        .split(',')
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if set.is_empty() {
+        None
+    } else {
+        Some(set)
+    }
+}
+
+/// Returns true if the product is in the default "In Charge" set.
+///
+/// The set is supplied via the `FD_DEFAULT_IN_CHARGE_PRODUCTS` environment
+/// variable as comma-separated product names. No products are pre-configured
+/// in the code, so this repository ships tenant-agnostic defaults.
+pub fn is_default_in_charge(product: &str) -> bool {
+    match product_set_from_env("FD_DEFAULT_IN_CHARGE_PRODUCTS") {
+        Some(set) => set.contains(&product.trim().to_lowercase()),
+        None => false,
+    }
+}
+
+/// Statistics for a single product in a quarter.
+#[derive(Debug, Clone, Default)]
 pub struct ProductQuarterReport {
     pub product: String,
     pub total_tickets: u64,

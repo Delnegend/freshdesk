@@ -240,7 +240,7 @@ impl TicketSearchBuilder {
         Self::default()
     }
 
-    /// Filter by component product name (e.g. "product", "product", "product").
+    /// Filter by component product name (e.g. "your-product").
     pub fn component(mut self, component: impl AsRef<str>) -> Self {
         self.clauses
             .push(format!("cf__components:'{}'", component.as_ref()));

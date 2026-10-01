@@ -63,7 +63,7 @@ Searches tickets using Freshdesk query syntax. Returns total count and current p
 
 ```rust
 let query = SearchTicketsQuery::builder()
-    .component("product")
+    .component("your-product")
     .created_after("2026-09-01")
     .created_before("2026-09-30")
     .status(7)
@@ -138,7 +138,7 @@ let l3_allowed: Option<i64> = ticket.l3_time_allowed();   // "2d 18h" -> 237_600
 let l3_actual: Option<i64> = ticket.l3_time_actual();     // "10m 54s" -> 654
 let l3_breached: bool = ticket.l3_time_violated();        // actual > allowed
 
-// List of assigned product components (e.g. ["product"])
+// List of assigned product components (e.g. ["your-product"])
 let components: Vec<String> = ticket.components();
 
 // Consolidated summary

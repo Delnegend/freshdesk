@@ -63,9 +63,16 @@ which encodes exactly the same comparison. That equivalence is asserted by
 fails and the query gets revisited.
 
 ### Default "In Charge" Products
-By default, the following 17 products have their checkboxes checked (`TRUE`):
+The set of products checked (`TRUE`) by default is tenant-specific and is
+**not baked into this repository**. Supply it as a comma-separated list in
+`.env`:
 
-All other products default to `FALSE`.
+```env
+FD_DEFAULT_IN_CHARGE_PRODUCTS=your-product-a,your-product-b
+```
+
+Products in that list are checked (`TRUE`); all others default to `FALSE`.
+When the variable is unset, no product is checked.
 
 ### Dynamic Overdue Rate (Right Side)
 - **Cell H1**: Header `"Overdue Rate"`.

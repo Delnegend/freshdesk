@@ -2,7 +2,7 @@
 name = "freshdesk"
 version = "0.1.0"
 edition = "2021"
-authors = ["Freshdesk Rust Client Team"]
+authors = ["Delnegend <kiennguyen19323@gmail.com>"]
 description = "Freshdesk API client and CLI written in Rust"
 license = "MIT"
 

@@ -114,6 +114,7 @@ cargo run -- report 2026Q3 --output my_report.xlsx
 
 The Excel file includes:
 - **Table columns**:
+  - `In Charge`: Interactive Excel checkboxes, defaulting to `TRUE` for the products listed in the `FD_DEFAULT_IN_CHARGE_PRODUCTS` env var (comma-separated; see `.env`) and `FALSE` for all others. Nothing is hardcoded.
   - `Product`: Component name (`_Components`).
   - `Total Tickets`: Number of total tickets created in that quarter.
   - `Total Overdue Ticket`: Total number of TTR overdue tickets in that quarter.

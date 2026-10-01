@@ -130,7 +130,7 @@ fn test_search_tickets_query() {
 #[test]
 fn test_ticket_search_builder() {
     let query = SearchTicketsQuery::builder()
-        .component("product")
+        .component("your-product")
         .created_after("2026-09-01")
         .created_before("2026-09-30")
         .status(2)
@@ -140,7 +140,7 @@ fn test_ticket_search_builder() {
 
     assert_eq!(
         query.query,
-        "cf__components:'product' AND created_at:>'2026-09-01' AND created_at:<'2026-09-30' AND status:2 AND priority:1"
+        "cf__components:'your-product' AND created_at:>'2026-09-01' AND created_at:<'2026-09-30' AND status:2 AND priority:1"
     );
     assert_eq!(query.page, Some(2));
 }
@@ -181,28 +181,44 @@ fn test_search_result_deserialization() {
 
 #[test]
 fn test_default_in_charge_products() {
-    use freshdesk::report::is_default_in_charge;
+    use freshdesk::report::product_set_from_env;
 
-let defaults: &[&str] = &[];
+    // Drives parsing from the environment using arbitrary placeholder names,
+    // so this test stays tenant-agnostic.
+    const KEY: &str = "FD_TEST_IN_CHARGE_SAMPLE";
+    std::env::set_var(KEY, "alpha,beta,Gamma");
 
-    for prod in defaults {
+    let Some(set) = product_set_from_env(KEY) else {
+        panic!("product_set_from_env should parse a non-empty list");
+    };
+    assert_eq!(set.len(), 3, "should parse 3 products: {set:?}");
+
+    for prod in ["alpha", "beta", "Gamma"] {
         assert!(
-            is_default_in_charge(prod),
-            "Expected {} to be default in charge",
-            prod
+            is_default_in_charge_from(prod, &set),
+            "Expected {prod} to be in the in-charge set"
         );
         assert!(
-            is_default_in_charge(&prod.to_lowercase()),
-            "Case insensitive check for {}",
-            prod
+            is_default_in_charge_from(&prod.to_lowercase(), &set),
+            "Lookup should be case insensitive for {prod}"
         );
     }
 
-    assert!(!is_default_in_charge("product"));
-    assert!(!is_default_in_charge("product"));
-    assert!(!is_default_in_charge("product"));
-    assert!(!is_default_in_charge("product"));
-    assert!(!is_default_in_charge("product"));
+    for prod in ["delta", "epsilon", "not-present"] {
+        assert!(
+            !is_default_in_charge_from(prod, &set),
+            "Expected {prod} to be absent from the in-charge set"
+        );
+    }
+
+    // A trimmed value with surrounding whitespace should still match.
+    assert!(is_default_in_charge_from("  alpha  ", &set));
+}
+
+/// Mirrors `is_default_in_charge` but against an explicit set, so the test does
+/// not depend on process-wide environment mutation.
+fn is_default_in_charge_from(product: &str, set: &std::collections::HashSet<String>) -> bool {
+    set.contains(&product.trim().to_lowercase())
 }
 
 /// Builds a minimal ticket carrying only the fields the overdue logic reads.
@@ -291,9 +307,9 @@ fn test_excel_checkbox_and_formula_writer() {
     worksheet.write(0, 4, "Overdue Rate").unwrap();
     worksheet.write(0, 5, "Overdue Tickets").unwrap();
 
-    // Row 1 (product: default in charge -> true)
+    // Row 1 (a product, checked in charge -> true)
     worksheet.insert_checkbox(1, 0, true).unwrap();
-    worksheet.write(1, 1, "product").unwrap();
+    worksheet.write(1, 1, "Product-A").unwrap();
     worksheet.write(1, 2, 748).unwrap();
     worksheet.write(1, 3, 64).unwrap();
     worksheet
@@ -301,9 +317,9 @@ fn test_excel_checkbox_and_formula_writer() {
         .unwrap();
     worksheet.write(1, 5, "82348, 82279").unwrap();
 
-    // Row 2 (product: default in charge -> false)
+    // Row 2 (another product, not in charge -> false)
     worksheet.insert_checkbox(2, 0, false).unwrap();
-    worksheet.write(2, 1, "product").unwrap();
+    worksheet.write(2, 1, "Product-B").unwrap();
     worksheet.write(2, 2, 670).unwrap();
     worksheet.write(2, 3, 10).unwrap();
     worksheet

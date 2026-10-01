@@ -2,11 +2,16 @@ use freshdesk::client::FreshdeskClient;
 use freshdesk::query::{ListInclude, ListTicketsQuery, SearchTicketsQuery};
 use std::collections::HashSet;
 
-/// Baseline list of products/components configured in Freshdesk as of 2026.
-/// This test verifies that the upstream choices for `_Components` match our expectations,
-/// catching any upstream additions, removals, or renames.
-let defaults: &[&str] = &[];
+/// Baseline catalog is supplied via the `FD_BASELINE_COMPONENTS` environment
+/// variable as comma-separated product names, so this repository stays free of
+/// any specific account's product catalog. The test skips when it is unset.
+const BASELINE_ENV: &str = "FD_BASELINE_COMPONENTS";
+
+#[tokio::test]
 async fn test_upstream_components_schema_changes() {
+    // Load .env so FD_BASELINE_COMPONENTS is available to the test process.
+    let _ = dotenvy::dotenv();
+
     let client = match FreshdeskClient::from_env().await {
         Ok(c) => c,
         Err(e) => {
@@ -28,29 +33,37 @@ async fn test_upstream_components_schema_changes() {
         println!("  [{:>2}] {}", i + 1, c);
     }
 
-    let baseline_set: HashSet<&str> = BASELINE_COMPONENTS.iter().copied().collect();
-    let upstream_set: HashSet<&str> = upstream_components.iter().map(|s| s.as_str()).collect();
+    let Some(baseline) = freshdesk::report::product_set_from_env(BASELINE_ENV) else {
+        eprintln!(
+            "Skipping component catalog test: {} is not set",
+            BASELINE_ENV
+        );
+        return;
+    };
+    let baseline_len = baseline.len();
 
-    let added: Vec<&str> = upstream_set.difference(&baseline_set).copied().collect();
+    let upstream_set: HashSet<String> = upstream_components
+        .iter()
+        .map(|s| s.trim().to_lowercase())
+        .collect();
 
-    let removed: Vec<&str> = baseline_set.difference(&upstream_set).copied().collect();
+    let mut added: Vec<&String> = upstream_set.difference(&baseline).collect();
+    let mut removed: Vec<&String> = baseline.difference(&upstream_set).collect();
+    added.sort();
+    removed.sort();
 
     if !added.is_empty() || !removed.is_empty() {
         panic!(
             "\nUpstream _Components choices have changed!\n\
              Added components:   {:?}\n\
              Removed components: {:?}\n\
-             Please update the baseline and application components accordingly.",
-            added, removed
+             Update {} in .env to match.",
+            added, removed, BASELINE_ENV
         );
     }
 
-    assert_eq!(
-        upstream_components.len(),
-        BASELINE_COMPONENTS.len(),
-        "Component count mismatch"
-    );
-    println!("\nUpstream _Components list matches baseline perfectly (38 components).");
+    assert_eq!(upstream_set.len(), baseline_len, "Component count mismatch");
+    println!("\nUpstream _Components matches baseline: {baseline_len} components.");
 }
 
 #[tokio::test]

@@ -117,7 +117,7 @@ struct SearchArgs {
     #[arg(default_value = "")]
     query: String,
 
-    /// Filter by component product name (e.g. "product", "product", "product")
+    /// Filter by component product name (e.g. "your-product")
     #[arg(long)]
     component: Option<String>,
 

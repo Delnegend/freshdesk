@@ -136,10 +136,16 @@ impl QuarterlyReportData {
         );
         let mut overdue_by_product: HashMap<String, Vec<u64>> = HashMap::new();
 
-        // Freshdesk search API allows up to 10 pages (300 results per query)
+        // A ticket counts as overdue only when it breached *both* its TTR SLA
+        // and its L3 escalation SLA. Lucene cannot compare two fields
+        // (`cf__l3_time_actual:>cf__l3_time_allowed` is rejected with 400), so
+        // the query matches the upstream `cf__l3_violated` automation field,
+        // which encodes exactly `_L3 Time Actual > _L3 Time Allowed`.
+        // `tests/live_tests.rs` guards that equivalence.
         for page in 1..=10 {
             let overdue_query = format!(
-                "created_at:>'{}' AND created_at:<'{}' AND cf_ttr_overdue:'Yes'",
+                "created_at:>'{}' AND created_at:<'{}' \
+                 AND (cf_ttr_overdue:'Yes' AND cf__l3_violated:'Yes')",
                 start_day_before, end_day_after
             );
 

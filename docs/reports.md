@@ -36,9 +36,31 @@ Generated using [`rust_xlsxwriter`](https://crates.io/crates/rust_xlsxwriter):
 | **A** | `In Charge` | Interactive checkboxes | `TRUE` for 17 core products, `FALSE` for others |
 | **B** | `Product` | Product name from `_Components` | Text |
 | **C** | `Total Tickets` | Number of tickets created in quarter | Integer (right aligned) |
-| **D** | `Total Overdue Ticket` | Number of TTR overdue tickets | Integer (right aligned) |
+| **D** | `Total Overdue Ticket` | Number of overdue tickets (see below) | Integer (right aligned) |
 | **E** | `Overdue Rate` | Per-product overdue percentage | Formula: `=IF(C{row}>0, D{row}/C{row}, 0)` (`0.00%`) |
 | **F** | `Overdue Tickets` | Comma-separated list of overdue IDs | Text (`82348, 82279, ...`) |
+
+### Overdue Criteria (AND)
+
+A ticket is counted as overdue only when **both** criteria hold:
+
+1. **TTR overdue** — `cf_ttr_overdue` is `Yes` (or, when that field is absent,
+   `due_by` has passed for a ticket that is not yet Resolved/Closed).
+2. **L3 escalation breached** — `_L3 Time Actual` > `_L3 Time Allowed`
+   (`cf__l3_time_actual` vs `cf__l3_time_allowed`), compared as parsed
+   durations. A ticket missing either value fails this criterion.
+
+Both must hold; a ticket breaching only one is **not** overdue. For 2026Q3 this
+reduces the overdue count from 348 (TTR only) to 142.
+
+`Ticket::ttr_overdue()` implements this in Rust via `src/duration.rs`. Because
+Freshdesk's Lucene interface cannot compare two fields
+(`cf__l3_time_actual:>cf__l3_time_allowed` returns HTTP 400), the report's
+server-side query matches the upstream `cf__l3_violated` automation field,
+which encodes exactly the same comparison. That equivalence is asserted by
+`test_l3_violated_field_matches_computed_comparison` in
+`tests/component_tests.rs`, so if upstream automation ever drifts the test
+fails and the query gets revisited.
 
 ### Default "In Charge" Products
 By default, the following 17 products have their checkboxes checked (`TRUE`):

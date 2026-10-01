@@ -130,8 +130,13 @@ let ttr_due: Option<DateTime<Utc>> = ticket.ttr_time();
 // Human-readable remaining/elapsed time (e.g. "6d 23h 44m 36s")
 let ttr_str: Option<&str> = ticket.ttr_time_str();
 
-// True if resolution is overdue
+// True if overdue: TTR SLA **and** L3 escalation SLA were both breached
 let is_overdue: bool = ticket.ttr_overdue();
+
+// L3 escalation SLA, parsed into seconds
+let l3_allowed: Option<i64> = ticket.l3_time_allowed();   // "2d 18h" -> 237_600
+let l3_actual: Option<i64> = ticket.l3_time_actual();     // "10m 54s" -> 654
+let l3_breached: bool = ticket.l3_time_violated();        // actual > allowed
 
 // List of assigned product components (e.g. ["product"])
 let components: Vec<String> = ticket.components();

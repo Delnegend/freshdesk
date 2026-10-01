@@ -99,21 +99,90 @@ async fn test_ticket_extracted_properties() {
         assert_eq!(props.components, t.components());
     }
 
-    // 2. Search for an overdue ticket and verify ttr_overdue() is true
+    // 2. Overdue now requires TTR *and* L3 escalation SLA to both be breached.
     let search = SearchTicketsQuery::new("cf_ttr_overdue:'Yes'");
     let search_res = client
         .search_tickets(&search)
         .await
         .expect("Failed to search overdue tickets");
 
-    if let Some(overdue_ticket) = search_res.results.first() {
-        println!("\nOverdue Ticket #{}:", overdue_ticket.id);
-        println!("  TTR Overdue: {}", overdue_ticket.ttr_overdue());
-        println!("  TTR Time: {:?}", overdue_ticket.ttr_time());
-        println!("  TTR Time str: {:?}", overdue_ticket.ttr_time_str());
-        assert!(
-            overdue_ticket.ttr_overdue(),
-            "Expected ttr_overdue to be true for ticket with cf_ttr_overdue: 'Yes'"
+    if let Some(t) = search_res.results.first() {
+        println!("\nTTR-overdue Ticket #{}:", t.id);
+        println!("  L3 allowed:  {:?}", t.l3_time_allowed());
+        println!("  L3 actual:   {:?}", t.l3_time_actual());
+        println!("  L3 violated: {}", t.l3_time_violated());
+        println!("  Overdue:     {}", t.ttr_overdue());
+        assert_eq!(
+            t.ttr_overdue(),
+            t.l3_time_violated(),
+            "Overdue must equal L3 violation for a ticket already marked cf_ttr_overdue"
         );
     }
+}
+
+/// Guards the assumption the report's Lucene query relies on.
+///
+/// `report.rs` cannot ask Lucene to compare `_L3 Time Actual` against
+/// `_L3 Time Allowed` (that is rejected with HTTP 400), so the query matches the
+/// upstream `cf__l3_violated` automation field instead. That substitution is
+/// only correct while `cf__l3_violated` is exactly
+/// `_L3 Time Actual > _L3 Time Allowed`. If upstream automation drifts, this
+/// test fails and the report query must be revisited.
+#[tokio::test]
+async fn test_l3_violated_field_matches_computed_comparison() {
+    let client = match FreshdeskClient::from_env().await {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Skipping L3 equivalence test: {}", e);
+            return;
+        }
+    };
+
+    let query = ListTicketsQuery::new().per_page(100);
+    let tickets = client
+        .list_tickets(&query)
+        .await
+        .expect("Failed to list tickets");
+
+    let mut checked = 0usize;
+    let mut mismatches: Vec<String> = Vec::new();
+
+    for t in &tickets {
+        let (Some(actual), Some(allowed)) = (t.l3_time_actual(), t.l3_time_allowed()) else {
+            continue;
+        };
+        let Some(stated) = t.custom_field_str("cf__l3_violated") else {
+            continue;
+        };
+
+        checked += 1;
+        let stated_yes = stated.eq_ignore_ascii_case("yes");
+        if stated_yes != t.l3_time_violated() {
+            mismatches.push(format!(
+                "#{}: allowed={:?} actual={:?} stated={} computed={}",
+                t.id,
+                t.custom_field_str("cf__l3_time_allowed"),
+                t.custom_field_str("cf__l3_time_actual"),
+                stated,
+                t.l3_time_violated()
+            ));
+        }
+        let _ = (actual, allowed);
+    }
+
+    println!(
+        "\nL3 equivalence: compared {} tickets, {} mismatches",
+        checked,
+        mismatches.len()
+    );
+    assert!(
+        checked > 0,
+        "Expected at least one ticket with L3 time data"
+    );
+    assert!(
+        mismatches.is_empty(),
+        "`cf__l3_violated` no longer matches `_L3 Time Actual > _L3 Time Allowed`; \
+         the report's Lucene query must be updated.\n{}",
+        mismatches.join("\n")
+    );
 }

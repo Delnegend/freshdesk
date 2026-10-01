@@ -160,10 +160,45 @@ impl Ticket {
         self.custom_field_str("cf_ttr_time")
     }
 
-    /// TTR Overdue: boolean indicating whether the resolution SLA is violated/overdue.
-    /// Checks custom field `cf_ttr_overdue` ("Yes" -> true, "No" -> false),
-    /// or checks whether `due_by` has passed for unresolved tickets.
+    /// `_L3 Time Allowed` (`cf__l3_time_allowed`) in seconds, e.g. `"2d 18h"`.
+    pub fn l3_time_allowed(&self) -> Option<i64> {
+        self.custom_field_str("cf__l3_time_allowed")
+            .and_then(crate::duration::parse_duration)
+    }
+
+    /// `_L3 Time Actual` (`cf__l3_time_actual`) in seconds, e.g. `"10m 54s"`.
+    pub fn l3_time_actual(&self) -> Option<i64> {
+        self.custom_field_str("cf__l3_time_actual")
+            .and_then(crate::duration::parse_duration)
+    }
+
+    /// True when the L3 escalation SLA was breached, i.e. `_L3 Time Actual`
+    /// is strictly greater than `_L3 Time Allowed`.
+    ///
+    /// Both values must be present and parseable; a ticket with no L3 data is
+    /// never treated as L3-violated. This is derived from the raw time fields
+    /// rather than read from the upstream `cf__l3_violated` automation field,
+    /// so it stays correct even if that automation goes stale.
+    pub fn l3_time_violated(&self) -> bool {
+        match (self.l3_time_actual(), self.l3_time_allowed()) {
+            (Some(actual), Some(allowed)) => actual > allowed,
+            _ => false,
+        }
+    }
+
+    /// Overdue: the ticket has breached its resolution SLA **and** its L3
+    /// escalation SLA (`_L3 Time Actual` > `_L3 Time Allowed`).
+    ///
+    /// A ticket must satisfy both criteria to be reported as overdue.
     pub fn ttr_overdue(&self) -> bool {
+        self.ttr_overdue_base() && self.l3_time_violated()
+    }
+
+    /// Whether the ticket breached its TTR SLA, ignoring the L3 criterion.
+    ///
+    /// Reads `cf_ttr_overdue` ("Yes"/"No"), falling back to comparing `due_by`
+    /// against the current time for tickets that are not yet resolved or closed.
+    fn ttr_overdue_base(&self) -> bool {
         if let Some(val) = self.custom_field_str("cf_ttr_overdue") {
             if val.eq_ignore_ascii_case("yes") || val.eq_ignore_ascii_case("true") || val == "1" {
                 return true;

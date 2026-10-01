@@ -205,6 +205,75 @@ let defaults: &[&str] = &[];
     assert!(!is_default_in_charge("product"));
 }
 
+/// Builds a minimal ticket carrying only the fields the overdue logic reads.
+fn ticket_with_overdue_fields(
+    ttr_overdue: Option<&str>,
+    l3_allowed: Option<&str>,
+    l3_actual: Option<&str>,
+) -> Ticket {
+    let mut custom_fields = std::collections::HashMap::new();
+    if let Some(v) = ttr_overdue {
+        custom_fields.insert("cf_ttr_overdue".to_string(), serde_json::json!(v));
+    }
+    if let Some(v) = l3_allowed {
+        custom_fields.insert("cf__l3_time_allowed".to_string(), serde_json::json!(v));
+    }
+    if let Some(v) = l3_actual {
+        custom_fields.insert("cf__l3_time_actual".to_string(), serde_json::json!(v));
+    }
+    let json = serde_json::json!({
+        "id": 1,
+        "subject": "test",
+        "status": 2,
+        "priority": 1,
+        "custom_fields": custom_fields,
+    });
+    serde_json::from_value(json).expect("ticket fixture should deserialize")
+}
+
+#[test]
+fn test_l3_duration_extraction() {
+    let t = ticket_with_overdue_fields(Some("Yes"), Some("2d 18h"), Some("10m 54s"));
+    assert_eq!(t.l3_time_allowed(), Some(2 * 86_400 + 18 * 3_600));
+    assert_eq!(t.l3_time_actual(), Some(10 * 60 + 54));
+}
+
+#[test]
+fn test_l3_violation_compares_actual_against_allowed() {
+    // actual > allowed => violated
+    assert!(ticket_with_overdue_fields(Some("Yes"), Some("3h"), Some("4h 1m")).l3_time_violated());
+    // actual == allowed => not violated (strict comparison)
+    assert!(!ticket_with_overdue_fields(Some("Yes"), Some("3h"), Some("3h")).l3_time_violated());
+    // actual < allowed => not violated
+    assert!(
+        !ticket_with_overdue_fields(Some("Yes"), Some("3h"), Some("2h 59m")).l3_time_violated()
+    );
+}
+
+#[test]
+fn test_l3_violation_requires_both_values() {
+    // Missing either side cannot prove a violation.
+    assert!(!ticket_with_overdue_fields(Some("Yes"), Some("3h"), None).l3_time_violated());
+    assert!(!ticket_with_overdue_fields(Some("Yes"), None, Some("4h")).l3_time_violated());
+    assert!(!ticket_with_overdue_fields(Some("Yes"), None, None).l3_time_violated());
+    // 0s on both sides is a legitimate "not violated".
+    assert!(!ticket_with_overdue_fields(Some("Yes"), Some("0s"), Some("0s")).l3_time_violated());
+}
+
+#[test]
+fn test_overdue_requires_ttr_and_l3() {
+    // Both breached => overdue.
+    assert!(ticket_with_overdue_fields(Some("Yes"), Some("3h"), Some("4h")).ttr_overdue());
+    // TTR breached but L3 within SLA => NOT overdue (the AND criterion).
+    assert!(!ticket_with_overdue_fields(Some("Yes"), Some("3h"), Some("1h")).ttr_overdue());
+    // L3 breached but TTR within SLA => NOT overdue.
+    assert!(!ticket_with_overdue_fields(Some("No"), Some("3h"), Some("4h")).ttr_overdue());
+    // Neither breached => not overdue.
+    assert!(!ticket_with_overdue_fields(Some("No"), Some("3h"), Some("1h")).ttr_overdue());
+    // TTR breached, L3 data absent => NOT overdue (criterion unmet).
+    assert!(!ticket_with_overdue_fields(Some("Yes"), None, None).ttr_overdue());
+}
+
 #[test]
 fn test_excel_checkbox_and_formula_writer() {
     use rust_xlsxwriter::{Format, Workbook};

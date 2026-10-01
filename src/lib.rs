@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod client;
+pub mod duration;
 pub mod error;
 pub mod models;
 pub mod query;

@@ -84,33 +84,37 @@ impl Quarter {
     }
 }
 
-/// Parses a comma-separated product list from an environment variable into a
-/// lowercased set for case-insensitive lookup. Returns `None` when the variable
-/// is unset, empty, or contains only separators.
-pub fn product_set_from_env(key: &str) -> Option<HashSet<String>> {
-    let raw = std::env::var(key).ok()?;
+/// Parses a comma-separated product list into a lowercased set for
+/// case-insensitive lookup. Returns `None` when the input is empty or
+/// contains only separators.
+pub fn parse_product_set(raw: &str) -> Option<HashSet<String>> {
     let set: HashSet<String> = raw
         .split(',')
         .map(|s| s.trim().to_lowercase())
         .filter(|s| !s.is_empty())
         .collect();
-    if set.is_empty() {
-        None
-    } else {
-        Some(set)
-    }
+    (!set.is_empty()).then_some(set)
 }
 
-/// Returns true if the product is in the default "In Charge" set.
+/// Reads a comma-separated product list from an environment variable.
+/// Returns `None` when the variable is unset, empty, or only separators.
+pub fn product_set_from_env(key: &str) -> Option<HashSet<String>> {
+    parse_product_set(&std::env::var(key).ok()?)
+}
+
+/// Returns true if the product is in the configured "In Charge" set.
 ///
 /// The set is supplied via the `FD_DEFAULT_IN_CHARGE_PRODUCTS` environment
 /// variable as comma-separated product names. No products are pre-configured
 /// in the code, so this repository ships tenant-agnostic defaults.
 pub fn is_default_in_charge(product: &str) -> bool {
-    match product_set_from_env("FD_DEFAULT_IN_CHARGE_PRODUCTS") {
-        Some(set) => set.contains(&product.trim().to_lowercase()),
-        None => false,
-    }
+    product_set_from_env("FD_DEFAULT_IN_CHARGE_PRODUCTS")
+        .is_some_and(|set| set.contains(&product.trim().to_lowercase()))
+}
+
+/// Returns true if the product is in the given in-charge set.
+pub fn is_in_product_set(product: &str, set: &HashSet<String>) -> bool {
+    set.contains(&product.trim().to_lowercase())
 }
 
 /// Statistics for a single product in a quarter.
@@ -332,15 +336,21 @@ impl QuarterlyReportData {
             .write_with_format(0, 5, "Overdue Tickets", &header_format)
             .map_err(|e| FreshdeskError::Configuration(e.to_string()))?;
 
-        // 2. Write data rows
+        // 2. Write data rows.
+        // Resolve the in-charge set once (it comes from the environment) rather
+        // than re-reading and re-parsing it for every product row.
+        let in_charge = product_set_from_env("FD_DEFAULT_IN_CHARGE_PRODUCTS");
         let num_products = self.products.len();
         for (i, p) in self.products.iter().enumerate() {
             let row = (i + 1) as u32;
             let excel_row = row + 1; // 1-indexed for Excel formulas
 
-            // In Charge: Checkbox
-            // Defaults to TRUE only for the specified products, FALSE for all others
-            let checked = is_default_in_charge(&p.product);
+            // In Charge: Checkbox. Defaults to TRUE only for products in the
+            // configured set (FALSE for all others, and for every product when
+            // the variable is unset).
+            let checked = in_charge
+                .as_ref()
+                .is_some_and(|set| is_in_product_set(&p.product, set));
             worksheet
                 .insert_checkbox(row, 0, checked)
                 .map_err(|e| FreshdeskError::Configuration(e.to_string()))?;

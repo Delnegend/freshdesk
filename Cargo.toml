@@ -1,7 +1,7 @@
 [package]
 name = "freshdesk"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Delnegend <kiennguyen19323@gmail.com>"]
 description = "Freshdesk API client and CLI written in Rust"
 license = "MIT"

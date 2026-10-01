@@ -1,5 +1,5 @@
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, COOKIE, USER_AGENT};
 use reqwest::Response;
+use reqwest::header::{AUTHORIZATION, COOKIE, HeaderMap, HeaderValue, USER_AGENT};
 use serde::de::DeserializeOwned;
 use tracing::{debug, info};
 use url::Url;
@@ -9,8 +9,7 @@ use crate::error::{FreshdeskError, Result};
 use crate::models::{Agent, SearchResult, Ticket, TicketField};
 use crate::query::{GetTicketQuery, ListTicketsQuery, SearchTicketsQuery};
 
-const DEFAULT_USER_AGENT: &str =
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 /// Client for the Freshdesk REST API (v2).
 #[derive(Debug, Clone)]
@@ -36,8 +35,8 @@ impl FreshdeskClient {
 
         match &auth {
             AuthMethod::ApiKey(key) => {
-                use base64::engine::general_purpose::STANDARD as BASE64;
                 use base64::Engine;
+                use base64::engine::general_purpose::STANDARD as BASE64;
                 let creds = format!("{}:X", key);
                 let encoded = BASE64.encode(creds.as_bytes());
                 let mut val =
@@ -353,16 +352,15 @@ pub async fn resolve_canonical_freshdesk_domain(server: &str) -> Result<String> 
         .build()?;
 
     let res = client.get(&check_url).send().await?;
-    if let Some(loc) = res.headers().get(reqwest::header::LOCATION) {
-        if let Ok(loc_str) = loc.to_str() {
-            if let Ok(url) = Url::parse(loc_str) {
-                // Check hd parameter
-                for (k, v) in url.query_pairs() {
-                    if k == "hd" && v.ends_with(".freshdesk.com") {
-                        info!("Discovered canonical domain: {}", v);
-                        return Ok(v.to_string());
-                    }
-                }
+    if let Some(loc) = res.headers().get(reqwest::header::LOCATION)
+        && let Ok(loc_str) = loc.to_str()
+        && let Ok(url) = Url::parse(loc_str)
+    {
+        // Check hd parameter
+        for (k, v) in url.query_pairs() {
+            if k == "hd" && v.ends_with(".freshdesk.com") {
+                info!("Discovered canonical domain: {}", v);
+                return Ok(v.to_string());
             }
         }
     }

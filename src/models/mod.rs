@@ -207,10 +207,11 @@ impl Ticket {
                 return false;
             }
         }
-        if let Some(due) = self.due_by {
-            if self.status != 4 && self.status != 5 {
-                return due < Utc::now();
-            }
+        if let Some(due) = self.due_by
+            && self.status != 4
+            && self.status != 5
+        {
+            return due < Utc::now();
         }
         false
     }
@@ -236,12 +237,12 @@ impl Ticket {
                     }
                 }
             }
-            if let Some(val) = cf.get("cf_component") {
-                if let Some(s) = val.as_str() {
-                    let trimmed = s.trim();
-                    if !trimmed.is_empty() && trimmed != "null" {
-                        return vec![trimmed.to_string()];
-                    }
+            if let Some(val) = cf.get("cf_component")
+                && let Some(s) = val.as_str()
+            {
+                let trimmed = s.trim();
+                if !trimmed.is_empty() && trimmed != "null" {
+                    return vec![trimmed.to_string()];
                 }
             }
         }

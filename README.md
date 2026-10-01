@@ -24,25 +24,38 @@ A fast, idiomatic Freshdesk REST API (v2) client written in Rust, supporting tic
 
 ## Configuration
 
-Settings can be specified in `.env` or passed via CLI flags. `FD_SERVER` is
-**required** — point it at your own Freshdesk account. No account is hardcoded
-anywhere in this repository.
+Copy the template and fill it in for your account:
+
+```bash
+cp .env.example .env
+```
+
+Settings live in `.env` (gitignored) or can be passed as CLI flags. `FD_SERVER`
+is **required** — point it at your own Freshdesk account. No account data is
+hardcoded anywhere in this repository, including the product catalog.
 
 ```env
-# Required: your Freshdesk account domain.
-# Either the canonical host, or a custom portal domain (auto-resolved).
-FD_SERVER=your-account.freshdesk.com
-
-# Credentials for the automated agent login (see docs/authentication.md)
-FD_USER=agent@example.com
+FD_SERVER=your-account.freshdesk.com   # required; custom portal domains are auto-resolved
+FD_USER=agent@example.com              # for the automated agent login
 FD_PASSWORD=your_password
 FD_TOTP_SEED=YOUR_BASE32_TOTP_SEED
+# FD_API_KEY=your_api_key               # or authenticate with an API key instead
+# FD_SESSION_COOKIE=...                 # or with an existing session cookie
+```
 
-# Or authenticate with a direct API key instead:
-# FD_API_KEY=your_api_key
+The product catalog is account-specific, so it also lives in `.env` (quoted —
+unquoted values containing spaces get dropped by the parser):
 
-# Or with a session cookie captured elsewhere:
-# FD_SESSION_COOKIE=user_credentials=...; _helpkit_session=...
+```env
+FD_BASELINE_COMPONENTS="product-a,product-b"        # expected _Components catalog
+FD_DEFAULT_IN_CHARGE_PRODUCTS="product-a"           # report default checkboxes
+```
+
+Regenerate both from the live API at any time:
+
+```bash
+bun run scripts/sync-products.ts            # rewrite the two keys in .env
+bun run scripts/sync-products.ts -- --print # just print the catalog
 ```
 
 ## CLI Usage

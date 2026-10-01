@@ -52,11 +52,11 @@ impl AuthMethod {
         }
 
         // 3. Check for existing session file
-        if let Some(session_path) = find_session_file() {
-            if let Ok(cookie_header) = read_session_file(&session_path) {
-                info!("Loaded session cookie from {:?}", session_path);
-                return Ok(Self::SessionCookie(cookie_header));
-            }
+        if let Some(session_path) = find_session_file()
+            && let Ok(cookie_header) = read_session_file(&session_path)
+        {
+            info!("Loaded session cookie from {:?}", session_path);
+            return Ok(Self::SessionCookie(cookie_header));
         }
 
         // 4. Try running login helper if credentials are present

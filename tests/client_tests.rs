@@ -181,44 +181,40 @@ fn test_search_result_deserialization() {
 
 #[test]
 fn test_default_in_charge_products() {
-    use freshdesk::report::product_set_from_env;
+    use freshdesk::report::{is_in_product_set, parse_product_set};
 
-    // Drives parsing from the environment using arbitrary placeholder names,
-    // so this test stays tenant-agnostic.
-    const KEY: &str = "FD_TEST_IN_CHARGE_SAMPLE";
-    std::env::set_var(KEY, "alpha,beta,Gamma");
-
-    let Some(set) = product_set_from_env(KEY) else {
-        panic!("product_set_from_env should parse a non-empty list");
-    };
+    // Exercises the pure parser with arbitrary placeholder names, so this test
+    // stays tenant-agnostic and needs no process-wide env mutation.
+    let set = parse_product_set("alpha,beta,Gamma").expect("should parse a non-empty list");
     assert_eq!(set.len(), 3, "should parse 3 products: {set:?}");
 
     for prod in ["alpha", "beta", "Gamma"] {
         assert!(
-            is_default_in_charge_from(prod, &set),
+            is_in_product_set(prod, &set),
             "Expected {prod} to be in the in-charge set"
         );
         assert!(
-            is_default_in_charge_from(&prod.to_lowercase(), &set),
+            is_in_product_set(&prod.to_lowercase(), &set),
             "Lookup should be case insensitive for {prod}"
         );
     }
 
     for prod in ["delta", "epsilon", "not-present"] {
         assert!(
-            !is_default_in_charge_from(prod, &set),
+            !is_in_product_set(prod, &set),
             "Expected {prod} to be absent from the in-charge set"
         );
     }
 
-    // A trimmed value with surrounding whitespace should still match.
-    assert!(is_default_in_charge_from("  alpha  ", &set));
-}
+    // Surrounding whitespace is trimmed.
+    assert!(is_in_product_set("  alpha  ", &set));
+    // Multi-word names survive intact.
+    let multi = parse_product_set("Multi Word,other").expect("should parse");
+    assert!(multi.contains("multi word"));
 
-/// Mirrors `is_default_in_charge` but against an explicit set, so the test does
-/// not depend on process-wide environment mutation.
-fn is_default_in_charge_from(product: &str, set: &std::collections::HashSet<String>) -> bool {
-    set.contains(&product.trim().to_lowercase())
+    // Empty / separator-only input yields None.
+    assert!(parse_product_set("").is_none());
+    assert!(parse_product_set(" , , ").is_none());
 }
 
 /// Builds a minimal ticket carrying only the fields the overdue logic reads.

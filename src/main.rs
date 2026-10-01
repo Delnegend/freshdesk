@@ -416,7 +416,9 @@ async fn handle_search(
 
     let query = builder.build();
     if query.query.trim().is_empty() {
-        eprintln!("Error: Please provide a query string or at least one filter (--component, --created-after, etc.)");
+        eprintln!(
+            "Error: Please provide a query string or at least one filter (--component, --created-after, etc.)"
+        );
         std::process::exit(1);
     }
 
@@ -874,38 +876,38 @@ fn print_single_ticket(t: &Ticket) {
 
     println!("{table}");
 
-    if let Some(convs) = &t.conversations {
-        if !convs.is_empty() {
-            println!("\n=== Conversations ({} total) ===", convs.len());
-            for (idx, c) in convs.iter().enumerate() {
-                let note_type = if c.private.unwrap_or(false) {
-                    "Private Note"
-                } else if c.incoming.unwrap_or(false) {
-                    "Incoming Reply"
-                } else {
-                    "Outgoing Reply"
-                };
-                let from_str = c
-                    .from_email
-                    .as_deref()
-                    .or(c.support_email.as_deref())
-                    .unwrap_or("Agent");
-                let date_str = c
-                    .created_at
-                    .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-                    .unwrap_or_else(|| "-".to_string());
+    if let Some(convs) = &t.conversations
+        && !convs.is_empty()
+    {
+        println!("\n=== Conversations ({} total) ===", convs.len());
+        for (idx, c) in convs.iter().enumerate() {
+            let note_type = if c.private.unwrap_or(false) {
+                "Private Note"
+            } else if c.incoming.unwrap_or(false) {
+                "Incoming Reply"
+            } else {
+                "Outgoing Reply"
+            };
+            let from_str = c
+                .from_email
+                .as_deref()
+                .or(c.support_email.as_deref())
+                .unwrap_or("Agent");
+            let date_str = c
+                .created_at
+                .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                .unwrap_or_else(|| "-".to_string());
 
-                println!(
-                    "\n[#{}] {} from {} at {}",
-                    idx + 1,
-                    note_type,
-                    from_str,
-                    date_str
-                );
-                if let Some(body) = &c.body_text {
-                    println!("----------------------------------------");
-                    println!("{}", body.trim());
-                }
+            println!(
+                "\n[#{}] {} from {} at {}",
+                idx + 1,
+                note_type,
+                from_str,
+                date_str
+            );
+            if let Some(body) = &c.body_text {
+                println!("----------------------------------------");
+                println!("{}", body.trim());
             }
         }
     }

@@ -1,6 +1,26 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+/// Joins the `include` enum values into Freshdesk's comma-separated form.
+///
+/// Shared by [`ListTicketsQuery`] and [`GetTicketQuery`] so both emit the same
+/// `include=` payload instead of duplicating the join logic.
+fn joined_include<'a, T: Copy>(
+    values: &'a Option<Vec<T>>,
+    as_str: impl Fn(T) -> &'a str,
+) -> Option<String> {
+    let values = values.as_ref()?;
+    if values.is_empty() {
+        return None;
+    }
+    let joined = values
+        .iter()
+        .map(|v| as_str(*v))
+        .collect::<Vec<_>>()
+        .join(",");
+    Some(joined)
+}
+
 /// Predefined filter for tickets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PredefinedFilter {
@@ -176,11 +196,8 @@ impl ListTicketsQuery {
         if let Some(pp) = self.per_page {
             pairs.push(("per_page", pp.to_string()));
         }
-        if let Some(inc) = &self.include {
-            if !inc.is_empty() {
-                let joined = inc.iter().map(|i| i.as_str()).collect::<Vec<_>>().join(",");
-                pairs.push(("include", joined));
-            }
+        if let Some(joined) = joined_include(&self.include, |i| i.as_str()) {
+            pairs.push(("include", joined));
         }
         pairs
     }
@@ -316,11 +333,8 @@ impl GetTicketQuery {
 
     pub fn to_query_pairs(&self) -> Vec<(&'static str, String)> {
         let mut pairs = Vec::new();
-        if let Some(inc) = &self.include {
-            if !inc.is_empty() {
-                let joined = inc.iter().map(|i| i.as_str()).collect::<Vec<_>>().join(",");
-                pairs.push(("include", joined));
-            }
+        if let Some(joined) = joined_include(&self.include, |i| i.as_str()) {
+            pairs.push(("include", joined));
         }
         pairs
     }

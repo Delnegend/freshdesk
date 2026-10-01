@@ -19,9 +19,9 @@ flowchart TD
     end
 
     subgraph Freshdesk ["Freshdesk Infrastructure"]
-        Portal["Portal (care.your-account.freshdesk.com)"]
-        AuthOrg["Freshworks Org (your-account.freshdesk.com)"]
-        RESTAPI["Freshdesk API (your-account.freshdesk.com/api/v2)"]
+        Portal["Support Portal (FD_SERVER)"]
+        AuthOrg["Freshworks Org (myfreshworks.com)"]
+        RESTAPI["Freshdesk API (*.freshdesk.com/api/v2)"]
     end
 
     CLI --> Lib
@@ -39,7 +39,7 @@ flowchart TD
 
 ## 1. Domain Resolution
 
-Freshdesk v2 REST APIs are served strictly on canonical `*.freshdesk.com` domains (e.g., `your-account.freshdesk.com`). Custom vanity CNAMEs (such as `care.your-account.freshdesk.com`) host the customer-facing support portal and will return HTTP `404` for `/api/v2/*` endpoints.
+Freshdesk v2 REST APIs are served strictly on canonical `*.freshdesk.com` domains. Custom vanity CNAMEs host the customer-facing support portal and will return HTTP `404` for `/api/v2/*` endpoints.
 
 The client features automated domain discovery in `resolve_canonical_freshdesk_domain()`:
 1. If the provided server already ends with `.freshdesk.com`, it is used as-is.

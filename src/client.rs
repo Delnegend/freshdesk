@@ -24,9 +24,9 @@ impl FreshdeskClient {
     /// Creates a new FreshdeskClient with a server host/URL and authentication method.
     ///
     /// If `server` does not contain a scheme, `https://` is prepended.
-    /// If `server` is a custom portal domain (e.g. `care.your-account.freshdesk.com`),
-    /// call `resolve_canonical_domain` or `builder().resolve_domain(true)` to map
-    /// it to the canonical `.freshdesk.com` domain.
+    /// If `server` is a custom portal domain rather than a canonical
+    /// `*.freshdesk.com` host, use `builder().auto_resolve_domain(true)` to map
+    /// it to the canonical domain.
     pub fn new(server: impl AsRef<str>, auth: AuthMethod) -> Result<Self> {
         let server_str = server.as_ref().trim();
         let base_url = normalize_server_url(server_str)?;
@@ -73,12 +73,25 @@ impl FreshdeskClient {
         FreshdeskClientBuilder::default()
     }
 
-    /// Creates a FreshdeskClient automatically from `.env` and session files.
+    /// Creates a FreshdeskClient from the environment and any cached session.
+    ///
+    /// Requires `FD_SERVER` to name the Freshdesk account to target, either as a
+    /// canonical `*.freshdesk.com` host or a custom portal domain. There is no
+    /// built-in default: the account is deployment-specific and must be set
+    /// explicitly (typically in `.env`).
     pub async fn from_env() -> Result<Self> {
         let _ = dotenvy::dotenv();
 
-        let server =
-            std::env::var("FD_SERVER").unwrap_or_else(|_| "care.your-account.freshdesk.com".to_string());
+        let server = std::env::var("FD_SERVER")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| {
+                FreshdeskError::Configuration(
+                    "FD_SERVER is not set. Set it to your Freshdesk account domain \
+                     (e.g. FD_SERVER=your-account.freshdesk.com) in .env or the environment."
+                        .to_string(),
+                )
+            })?;
         info!("Initializing Freshdesk client for server: {}", server);
 
         let mut builder = Self::builder().server(&server).auto_resolve_domain(true);
@@ -315,8 +328,8 @@ fn normalize_server_url(server: &str) -> Result<Url> {
     Ok(url)
 }
 
-/// If a custom CNAME like `care.your-account.freshdesk.com` is provided, discovers the canonical
-/// `*.freshdesk.com` domain by querying the login redirect location.
+/// Discovers the canonical `*.freshdesk.com` domain for a custom portal CNAME by
+/// following the login redirect and reading its `hd` parameter.
 pub async fn resolve_canonical_freshdesk_domain(server: &str) -> Result<String> {
     let host = server
         .trim()

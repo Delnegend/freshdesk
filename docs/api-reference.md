@@ -22,12 +22,12 @@ use freshdesk::{
 ```rust
 pub async fn from_env() -> Result<Self>
 ```
-Initializes client using environment variables (`FD_SERVER`, `FD_API_KEY`, `FD_SESSION_COOKIE`, `FD_USER`, `FD_PASSWORD`, `FD_TOTP_SEED`) and cached session files. Automatically discovers canonical Freshdesk domains.
+Initializes client using environment variables (`FD_SERVER`, `FD_API_KEY`, `FD_SESSION_COOKIE`, `FD_USER`, `FD_PASSWORD`, `FD_TOTP_SEED`) and cached session files. Automatically discovers canonical Freshdesk domains. `FD_SERVER` is **required** — there is no built-in default, since the target account is deployment-specific.
 
 ### `FreshdeskClient::builder()`
 ```rust
 let client = FreshdeskClient::builder()
-    .server("care.your-account.freshdesk.com")
+    .server("your-account.freshdesk.com")
     .auto_resolve_domain(true)
     .auth(AuthMethod::ApiKey("secret_key".to_string()))
     .build()

@@ -16,7 +16,7 @@ use freshdesk::query::{
 #[command(about = "Freshdesk CLI client for listing, querying, and searching tickets", long_about = None)]
 #[command(version)]
 struct Cli {
-    /// Freshdesk server domain or URL (defaults to FD_SERVER env var or care.your-account.freshdesk.com)
+    /// Freshdesk account domain or URL (required; set FD_SERVER in .env, or pass --server)
     #[arg(long, env = "FD_SERVER", global = true)]
     server: Option<String>,
 
@@ -290,13 +290,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build client
     let mut builder = FreshdeskClient::builder().auto_resolve_domain(true);
 
-    if let Some(srv) = cli.server {
-        builder = builder.server(srv);
-    } else if let Ok(srv) = std::env::var("FD_SERVER") {
-        builder = builder.server(srv);
-    } else {
-        builder = builder.server("care.your-account.freshdesk.com");
-    }
+    // `--server` wins, then FD_SERVER from the environment / .env. There is no
+    // built-in default: the target account is deployment-specific.
+    let server = match cli.server {
+        Some(srv) => srv,
+        None => std::env::var("FD_SERVER")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| {
+                freshdesk::FreshdeskError::Configuration(
+                    "No Freshdesk server configured. Set FD_SERVER in .env (e.g. \
+                     FD_SERVER=your-account.freshdesk.com) or pass --server."
+                        .to_string(),
+                )
+            })?,
+    };
+    builder = builder.server(server);
 
     if let Some(key) = cli.api_key {
         builder = builder.auth(freshdesk::AuthMethod::ApiKey(key));

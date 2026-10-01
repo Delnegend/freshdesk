@@ -24,16 +24,24 @@ A fast, idiomatic Freshdesk REST API (v2) client written in Rust, supporting tic
 
 ## Configuration
 
-Settings can be specified in `.env` or passed via CLI flags:
+Settings can be specified in `.env` or passed via CLI flags. `FD_SERVER` is
+**required** — point it at your own Freshdesk account. No account is hardcoded
+anywhere in this repository.
 
 ```env
-FD_SERVER=care.your-account.freshdesk.com
+# Required: your Freshdesk account domain.
+# Either the canonical host, or a custom portal domain (auto-resolved).
+FD_SERVER=your-account.freshdesk.com
+
+# Credentials for the automated agent login (see docs/authentication.md)
 FD_USER=agent@example.com
 FD_PASSWORD=your_password
 FD_TOTP_SEED=YOUR_BASE32_TOTP_SEED
-# Or direct API Key:
+
+# Or authenticate with a direct API key instead:
 # FD_API_KEY=your_api_key
-# Or direct cookie:
+
+# Or with a session cookie captured elsewhere:
 # FD_SESSION_COOKIE=user_credentials=...; _helpkit_session=...
 ```
 

@@ -22,10 +22,15 @@ for (const line of envFile.split("\n")) {
   }
 }
 
-const server = env.FD_SERVER || "care.your-account.freshdesk.com";
+const server = env.FD_SERVER?.trim();
 const user = env.FD_USER;
 const password = env.FD_PASSWORD;
 const totpSeed = env.FD_TOTP_SEED;
+
+if (!server) {
+  console.error("FD_SERVER is not set. Add it to .env, e.g. FD_SERVER=your-account.freshdesk.com");
+  process.exit(1);
+}
 
 if (!user || !password) {
   console.error("FD_USER and FD_PASSWORD must be set in .env");
@@ -179,9 +184,11 @@ console.log(`[login] Final URL reached: ${page.url()}`);
 const cookies = await context.cookies();
 await browser.close();
 
-// Filter cookies for Freshdesk / your-account.freshdesk.com
+// Keep cookies that belong to the configured account: either the canonical
+// *.freshdesk.com host or whatever custom portal domain FD_SERVER names.
+const serverHost = server.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 const relevantCookies = cookies.filter(
-  (c) => c.domain.includes("freshdesk.com") || c.domain.includes("your-account.freshdesk.com")
+  (c) => c.domain.includes("freshdesk.com") || c.domain.includes(serverHost)
 );
 
 const cookieMap: Record<string, string> = {};

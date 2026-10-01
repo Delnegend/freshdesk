@@ -1,5 +1,4 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use comfy_table::modifiers::UTF8_ROUND_CORNERS;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{Attribute, Cell, Color, ContentArrangement, Table};
 use tracing_subscriber::EnvFilter;
@@ -497,8 +496,7 @@ async fn handle_me(
         println!("{}", serde_json::to_string_pretty(&agent)?);
     } else {
         let mut table = Table::new();
-        table.load_preset(UTF8_FULL);
-        table.apply_modifier(UTF8_ROUND_CORNERS);
+        table.load_style(UTF8_FULL.with_rounded_corners());
         table.set_content_arrangement(ContentArrangement::Dynamic);
 
         table.add_row(vec!["Field", "Value"]);
@@ -534,8 +532,7 @@ async fn handle_components(
             components.len()
         );
         let mut table = Table::new();
-        table.load_preset(UTF8_FULL);
-        table.apply_modifier(UTF8_ROUND_CORNERS);
+        table.load_style(UTF8_FULL.with_rounded_corners());
         table.set_content_arrangement(ContentArrangement::Dynamic);
 
         table.set_header(vec![
@@ -587,8 +584,7 @@ fn print_tickets_table(tickets: &[Ticket]) {
     }
 
     let mut table = Table::new();
-    table.load_preset(UTF8_FULL);
-    table.apply_modifier(UTF8_ROUND_CORNERS);
+    table.load_style(UTF8_FULL.with_rounded_corners());
     table.set_content_arrangement(ContentArrangement::Dynamic);
 
     table.set_header(vec![
@@ -669,8 +665,7 @@ fn print_properties_table(props: &[TicketSummaryProperties]) {
     }
 
     let mut table = Table::new();
-    table.load_preset(UTF8_FULL);
-    table.apply_modifier(UTF8_ROUND_CORNERS);
+    table.load_style(UTF8_FULL.with_rounded_corners());
     table.set_content_arrangement(ContentArrangement::Dynamic);
 
     table.set_header(vec![
@@ -726,8 +721,7 @@ fn print_properties_table(props: &[TicketSummaryProperties]) {
 
 fn print_single_properties(p: &TicketSummaryProperties) {
     let mut table = Table::new();
-    table.load_preset(UTF8_FULL);
-    table.apply_modifier(UTF8_ROUND_CORNERS);
+    table.load_style(UTF8_FULL.with_rounded_corners());
     table.set_content_arrangement(ContentArrangement::Dynamic);
 
     table.add_row(vec![
@@ -785,8 +779,7 @@ fn print_single_properties(p: &TicketSummaryProperties) {
 
 fn print_single_ticket(t: &Ticket) {
     let mut table = Table::new();
-    table.load_preset(UTF8_FULL);
-    table.apply_modifier(UTF8_ROUND_CORNERS);
+    table.load_style(UTF8_FULL.with_rounded_corners());
     table.set_content_arrangement(ContentArrangement::Dynamic);
 
     table.add_row(vec![

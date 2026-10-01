@@ -80,16 +80,16 @@ cargo run -- list --per-page 5 --json
 
 ```bash
 # Search by component and creation date range using dedicated flags
-cargo run -- search --component product --created-after 2026-09-25 --properties
+cargo run -- search --component <product> --created-after 2026-09-25 --properties
 
 # Fetch ALL matching tickets across pages (auto-pagination up to 300)
-cargo run -- search --component product --created-after 2026-09-25 --all --properties
+cargo run -- search --component <product> --created-after 2026-09-25 --all --properties
 
 # Search using Freshdesk Lucene query syntax
 cargo run -- search "priority:3 AND status:7"
 
 # Output JSON
-cargo run -- search --component product --created-after 2026-09-20 --properties --json
+cargo run -- search --component <product> --created-after 2026-09-20 --properties --json
 ```
 
 ### 5. View Single Ticket

@@ -71,16 +71,16 @@ Searches tickets using Freshdesk Lucene queries or dedicated CLI flags:
 ### Dedicated Flag Search
 ```bash
 # Filter by component product name
-cargo run -- search --component product --properties
+cargo run -- search --component <product> --properties
 
 # Filter by component and created date range
-cargo run -- search --component product --created-after 2026-09-20 --created-before 2026-09-30 --properties
+cargo run -- search --component <product> --created-after 2026-09-20 --created-before 2026-09-30 --properties
 
 # Fetch all matching tickets across multiple pages
-cargo run -- search --component product --created-after 2026-09-25 --all --properties
+cargo run -- search --component <product> --created-after 2026-09-25 --all --properties
 
 # Output as JSON
-cargo run -- search --component product --created-after 2026-09-25 --properties --json
+cargo run -- search --component <product> --created-after 2026-09-25 --properties --json
 ```
 
 ### Raw Lucene Syntax Search

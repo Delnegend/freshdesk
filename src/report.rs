@@ -155,7 +155,7 @@ impl QuarterlyReportData {
         // 1. Get all configured product components
         let mut components = client.get_components_choices().await?;
         if components.is_empty() {
-            components = vec!["product".to_string()];
+            components = vec!["Uncategorized".to_string()];
         }
 
         // 2. Fetch all overdue tickets in this quarter to group by component and collect IDs
@@ -189,7 +189,7 @@ impl QuarterlyReportData {
             for t in search_res.results {
                 let comp = t
                     .primary_component()
-                    .unwrap_or_else(|| "product".to_string());
+                    .unwrap_or_else(|| "Uncategorized".to_string());
                 overdue_by_product.entry(comp).or_default().push(t.id);
             }
 

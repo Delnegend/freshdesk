@@ -1,6 +1,6 @@
 <div align="center">
 
-# freshdesk
+# Freshdesk
 
 **Freshdesk API client and CLI in Rust — tickets, TOTP agent login, quarterly SLA reports.**
 

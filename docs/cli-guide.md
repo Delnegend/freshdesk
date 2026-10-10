@@ -131,7 +131,7 @@ cargo run -- report 2026Q3 --output Q3_summary.xlsx
 ```
 
 ### Output Layout
-- **Column A**: `In Charge` (Excel checkboxes, default `TRUE` for 17 core products, `FALSE` for others).
+- **Column A**: `In Charge` (Excel checkboxes, `TRUE` for the products in `FD_DEFAULT_IN_CHARGE_PRODUCTS`, `FALSE` for others).
 - **Column B**: `Product` (`_Components` name).
 - **Column C**: `Total Tickets` (total created in the quarter).
 - **Column D**: `Total Overdue Ticket` (total TTR overdue tickets in the quarter).

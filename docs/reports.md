@@ -33,7 +33,7 @@ Generated using [`rust_xlsxwriter`](https://crates.io/crates/rust_xlsxwriter):
 ### Columns
 | Col | Title | Description | Format |
 |---|---|---|---|
-| **A** | `In Charge` | Interactive checkboxes | `TRUE` for 17 core products, `FALSE` for others |
+| **A** | `In Charge` | Interactive checkboxes | `TRUE` for the products in `FD_DEFAULT_IN_CHARGE_PRODUCTS`, `FALSE` for others |
 | **B** | `Product` | Product name from `_Components` | Text |
 | **C** | `Total Tickets` | Number of tickets created in quarter | Integer (right aligned) |
 | **D** | `Total Overdue Ticket` | Number of overdue tickets (see below) | Integer (right aligned) |

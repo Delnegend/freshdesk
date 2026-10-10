@@ -1,37 +1,39 @@
 # CI/CD & Autonomous Upgrades
 
-This repository implements the `autonomous-upgrade` workflow architecture for dependency updates, continuous verification, and manual release triggering.
+This repository implements the `autonomous-upgrade` workflow architecture for dependency updates, continuous verification, and release automation (manual dispatch or weekly schedule), running in maintenance mode.
 
 ## Workflows Overview
 
 ```
 +-----------------------------------------------------------+
-| Dependabot (Daily 02:00 UTC)                              |
-| - 14-day Supply-Chain Quarantine Cooldown                 |
-| - Groups: patch-and-minor (auto-merge), major (review)    |
-+-----------------------------+-----------------------------+
+| Dependency PR sources                                     |
+| - deps.yml: daily 02:00 UTC `cargo update` / `bun update` |
+|    14-day cooldown via .cargo/config.toml & bunfig.toml   |
+| - dependabot.yml: github-actions, weekly Monday 02:00     |
+| Both open PRs labelled `dependencies`                     |
++-----------------------------------------------------------+
                               | (PR created)
                               v
 +-----------------------------------------------------------+
 | CI Gate: .github/workflows/ci.yml                         |
 | - Check: 'Check (just check)'                             |
 | - Executes `just check` (fmt, clippy, unit tests, types)  |
-+-----------------------------+-----------------------------+
++-----------------------------------------------------------+
                               | (Green status)
                               v
 +-----------------------------------------------------------+
-| Dependabot Auto-Merge: .github/workflows/dependabot-...   |
+| Auto-merge: .github/workflows/auto-merge.yml              |
 | - `gh pr merge --auto --rebase`                           |
-| - Merges patch/minor immediately                          |
+| - Merges any PR labelled `dependencies`                   |
 +-----------------------------------------------------------+
 
-                              [Accumulate on main]
-                                      |
-                                      | (User clicks "Run workflow")
+                            [Accumulate on main]
+                                      | (Weekly Sunday 00:00 UTC, or manual dispatch)
                                       v
 +-----------------------------------------------------------+
 | Release: .github/workflows/release.yml                    |
-| - Trigger: workflow_dispatch                              |
+| - Triggers: workflow_dispatch (new-tag/tag/commit)        |
+|   and weekly cron 0 0 * * 0 (Sunday 00:00 UTC)            |
 | - ietf-tools/semver-action derives version from commits   |
 | - Compiles release binary: freshdesk-linux-x64.tar.gz     |
 | - Publishes GitHub Release with generated release notes   |
@@ -52,28 +54,40 @@ This repository implements the `autonomous-upgrade` workflow architecture for de
 
 ---
 
-## 2. Dependabot Configuration (`.github/dependabot.yml`)
+## 2. Dependency Updates
 
-- Runs daily at `02:00 UTC`.
-- Covers `cargo` and `github-actions`.
-- Does **not** cover `bun`: Dependabot's `bun` updater image ships Bun 1.3.x, which cannot parse the `lockfileVersion: 2` lockfile that Bun 1.4+ writes, so every run fails with `Unsupported bun.lock 'lockfileVersion' 2`. This is blocked upstream on [dependabot-core#15897](https://github.com/dependabot/dependabot-core/issues/15897) (per-repository Bun versions in the updater image). Re-add the ecosystem in one line once that ships. See [dependabot-core#15848](https://github.com/dependabot/dependabot-core/issues/15848) for the original silent-lockfile-downgrade report.
-- Enforces `cooldown: default-days: 14` to quarantine newly published dependency versions for two weeks against supply-chain attacks (account takeovers, poisoned point-releases).
-- Isolates `patch-and-minor` updates from `major` breaking changes.
+### 2.1 Automated upgrades (`.github/workflows/deps.yml`)
+
+- **Trigger**: daily `0 2 * * *` (02:00 UTC), plus `workflow_dispatch`.
+- Runs `cargo update` and `bun update`, so each package manager applies its own release cooldown rather than a workflow-level gate.
+- **Cooldown**: 14 days, enforced by `.cargo/config.toml` (`global-min-publish-age = "14 days"`, requires Cargo ≥ 1.100) and `bunfig.toml` (`minimumReleaseAge = 1209600`). Versions published less than two weeks ago are skipped.
+- Opens — or force-pushes — a single `deps/automatic` PR labelled `dependencies`, titled `chore(deps): upgrade dependencies`. A run with no changes opens nothing.
+
+### 2.2 Dependabot (`.github/dependabot.yml`)
+
+- Retained **only** for the `github-actions` ecosystem; `cargo` and `bun` are handled by `deps.yml` instead.
+- Runs weekly, Monday at `02:00 UTC`.
+- Labels its PRs `dependencies`, so they flow through the same CI gate and auto-merge path.
+- Groups updates into `patch-and-minor` and `major`, caps open PRs at `2`, and prefixes commits with `chore(deps)`.
 
 ---
 
-## 3. Auto-Merge (`.github/workflows/dependabot-auto-merge.yml`)
+## 3. Auto-Merge (`.github/workflows/auto-merge.yml`)
 
-- Uses `gh pr merge --auto --rebase`.
-- Merges patch and minor dependency PRs automatically upon passing `just check`.
-- Leaves major breaking version upgrades open for human inspection.
+- **Trigger**: `pull_request` targeting `main`.
+- Runs only when the PR carries the `dependencies` label.
+- Enables `gh pr merge --auto --rebase`, so the PR rebases and merges as soon as the CI gate passes.
+- Keys on the label alone — it does **not** read Dependabot metadata — so any labelled PR is eligible regardless of author.
 
 ---
 
-## 4. Manual Release (`.github/workflows/release.yml`)
+## 4. Release (`.github/workflows/release.yml`)
 
-- **Trigger**: `workflow_dispatch` (manual button press).
+- **Triggers**:
+  - `workflow_dispatch` with a `target` choice (default `new-tag`) and an optional `ref` (tag or commit SHA).
+  - Weekly cron `0 0 * * 0` (Sunday 00:00 UTC), which runs the default `new-tag` path unattended.
+- **Targets**: `new-tag` (CI gate → `just bump` → atomic commit + tag push → build → publish), `tag` (rebuild an existing tag, defaulting to the latest semver tag, and publish), and `commit` (test build of the latest commit — or a given SHA — uploading Actions artifacts only, never a release).
 - **Concurrency**: `group: release-main`, `cancel-in-progress: false`.
 - **Version Calculation**: `ietf-tools/semver-action@v1` determines the next semantic version based on Conventional Commits since the last git tag (with fallback `v0.0.0`).
 - **Binary Packaging**: Compiles `target/release/freshdesk` and packages it into `dist/freshdesk-linux-x64.tar.gz`.
-- **Publishing**: `softprops/action-gh-release@v2` publishes the GitHub release with auto-generated release notes and attached binary asset.
+- **Publishing**: `softprops/action-gh-release@v3` publishes the GitHub release with auto-generated release notes and attached binary asset.

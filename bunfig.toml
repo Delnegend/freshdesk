@@ -1,0 +1,3 @@
+[install]
+# Supply chain security: quarantine any package version for 14 days (1209600s)
+minimumReleaseAge = 1209600

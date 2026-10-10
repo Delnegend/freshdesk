@@ -24,3 +24,8 @@ test-all:
 # Build release binary
 build:
     cargo build --release
+
+# Bump Cargo manifest version and update lockfile
+bump version:
+    sed -i -E '0,/^version = ".*"/s//version = "{{version}}"/' Cargo.toml
+    cargo check

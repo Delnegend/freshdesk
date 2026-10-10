@@ -1,7 +1,23 @@
-name: Release
+name: Release / Build Artifacts
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: "Release mode / build target"
+        required: true
+        type: choice
+        default: "new-tag"
+        options:
+          - new-tag  # Gate on CI -> bump version -> tag & push -> build & publish release
+          - tag      # Rebuild existing tag -> build & publish release
+          - commit   # Test build latest commit -> upload Actions artifacts only (no release)
+      ref:
+        description: "Custom tag or commit SHA (optional, defaults to latest)"
+        required: false
+        type: string
+  schedule:
+    - cron: '0 0 * * 0' # Weekly: Sunday 00:00 UTC (defaults to target: new-tag)
 
 concurrency:
   group: release-main
@@ -11,16 +27,48 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Tag & Release
-    runs-on: ubuntu-latest
+  prepare:
+    name: Prepare / Bump Version
+    runs-on: ubuntu-latest   # full runner: it runs `just check`
+    timeout-minutes: 30
+    outputs:
+      ref: ${{ steps.resolve.outputs.ref }}
+      version: ${{ steps.resolve.outputs.version }}
+      publish: ${{ steps.resolve.outputs.publish }}
+      skip: ${{ steps.resolve.outputs.skip }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
+          token: ${{ github.token }}
+          persist_credentials: true
           fetch-depth: 0
 
-      - name: Next version (Conventional Commits)
+      # `just check` needs both toolchains; `just bump` needs Cargo. rustfmt and
+      # clippy are not part of the minimal profile `rustup` installs by default,
+      # and the gate runs `cargo fmt --check` and `cargo clippy`.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: oven-sh/setup-bun@v2
+      - uses: extractions/setup-just@v4
+
+      # `semver-action` compares the commit range against `fallbackTag`, and its
+      # compare call fails when that tag does not exist yet. Anchor the first
+      # release at HEAD rather than requiring a hand-made tag first.
+      - name: Anchor the first release tag
+        if: (inputs.target || 'new-tag') == 'new-tag'
+        run: |
+          set -euo pipefail
+          if [ -z "$(git tag -l 'v[0-9]*')" ]; then
+            echo "no release tag yet — anchoring v0.0.0 at HEAD"
+            git -c user.name="github-actions[bot]" \
+                -c user.email="actions@users.noreply.github.com" \
+                tag -a v0.0.0 -m "Anchor tag for the first release calculation"
+            git push origin "refs/tags/v0.0.0"
+          fi
+
+      - name: Calculate Next SemVer
+        if: (inputs.target || 'new-tag') == 'new-tag'
         id: semver
         uses: ietf-tools/semver-action@v1
         with:
@@ -29,21 +77,98 @@ jobs:
           noNewCommitBehavior: silent
           noVersionBumpBehavior: patch
 
-      - name: Setup Rust toolchain
-        if: steps.semver.outputs.bump != 'none'
-        uses: dtolnay/rust-toolchain@stable
+      - name: CI Gate (verify code is green before bumping)
+        if: (inputs.target || 'new-tag') == 'new-tag' && steps.semver.outputs.bump != 'none'
+        run: just check
 
-      - name: Build release binary
-        if: steps.semver.outputs.bump != 'none'
+      - name: Bump package manager version
+        if: (inputs.target || 'new-tag') == 'new-tag' && steps.semver.outputs.bump != 'none'
+        env:
+          NEXT_STRICT: ${{ steps.semver.outputs.nextStrict }}
+        run: just bump "$NEXT_STRICT"
+
+      - name: Commit, Tag, and Push atomically
+        if: (inputs.target || 'new-tag') == 'new-tag' && steps.semver.outputs.bump != 'none'
+        env:
+          NEXT_TAG: ${{ steps.semver.outputs.next }}
         run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "actions@users.noreply.github.com"
+
+          git add -u
+          git diff --staged --quiet && { echo "::error::bump produced no change in package files"; exit 1; }
+          git commit -m "chore(release): ${NEXT_TAG}"
+
+          git rev-parse -q --verify "refs/tags/${NEXT_TAG}" >/dev/null && { echo "::error::tag ${NEXT_TAG} already exists"; exit 1; }
+          git tag -a "${NEXT_TAG}" -m "Release ${NEXT_TAG}"
+
+          git push origin HEAD:main "refs/tags/${NEXT_TAG}"
+
+      - name: Resolve outputs
+        id: resolve
+        env:
+          TARGET: ${{ inputs.target || 'new-tag' }}
+          INPUT_REF: ${{ inputs.ref }}
+          BUMP: ${{ steps.semver.outputs.bump }}
+          CURRENT: ${{ steps.semver.outputs.current }}
+          NEXT: ${{ steps.semver.outputs.next }}
+          NEXT_STRICT: ${{ steps.semver.outputs.nextStrict }}
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = "new-tag" ]; then
+            if [ "$BUMP" = "none" ]; then
+              echo "No version bump needed (current: ${CURRENT:-none})."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            {
+              echo "ref=$NEXT"
+              echo "version=$NEXT_STRICT"
+              echo "publish=true"
+              echo "skip=false"
+            } >> "$GITHUB_OUTPUT"
+          elif [ "$TARGET" = "tag" ]; then
+            TAG="${INPUT_REF:-$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1 || true)}"
+            [ -n "$TAG" ] || { echo "::error::No release tag found"; exit 1; }
+            { echo "ref=$TAG"; echo "version=${TAG#v}"; echo "publish=true"; echo "skip=false"; } >> "$GITHUB_OUTPUT"
+          else
+            SHA="${INPUT_REF:-$(git rev-parse HEAD)}"
+            { echo "ref=$SHA"; echo "version=$SHA"; echo "publish=false"; echo "skip=false"; } >> "$GITHUB_OUTPUT"
+            echo "Running test build against commit $SHA (will not publish release)"
+          fi
+
+  build:
+    name: Build & Release Artifacts
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Linux x64 tarball
+        run: |
+          set -euo pipefail
           cargo build --release --bin freshdesk
           mkdir -p dist
           tar -czvf dist/freshdesk-linux-x64.tar.gz -C target/release freshdesk
 
-      - name: Publish Release
-        if: steps.semver.outputs.bump != 'none'
+      - name: Upload build artifacts (always kept in the Actions run)
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-artifacts-${{ needs.prepare.outputs.ref }}
+          path: dist/
+          if-no-files-found: ignore
+
+      - name: Publish Consolidated Release
+        if: needs.prepare.outputs.publish == 'true'
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ steps.semver.outputs.next }}
-          files: dist/freshdesk-linux-x64.tar.gz
+          tag_name: ${{ needs.prepare.outputs.ref }}
           generate_release_notes: true
+          files: dist/*

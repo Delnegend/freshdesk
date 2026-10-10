@@ -70,11 +70,15 @@ const quoted = `"${list}"`;
 // Replace the two managed keys in place, or append them if absent.
 function upsert(text: string, key: string, value: string): string {
   const line = `${key}=${value}`;
-  const re = new RegExp(`^${key}=.*$`, "m");
-  if (re.test(text)) {
-    return text.replace(re, line);
+  const lines = text.split("\n");
+  const at = lines.findIndex((candidate) => candidate.startsWith(`${key}=`));
+  if (at === -1) {
+    return `${text.replace(/\n*$/, "\n")}\n${line}\n`;
   }
-  return `${text.replace(/\n*$/, "\n")}\n${line}\n`;
+  // Keep the line's own ending so a CRLF file stays CRLF.
+  const carriageReturn = lines[at].endsWith("\r") ? "\r" : "";
+  lines[at] = `${line}${carriageReturn}`;
+  return lines.join("\n");
 }
 
 let updated = upsert(envText, "FD_BASELINE_COMPONENTS", quoted);

@@ -37,7 +37,7 @@ jobs:
       publish: ${{ steps.resolve.outputs.publish }}
       skip: ${{ steps.resolve.outputs.skip }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           token: ${{ github.token }}
           persist_credentials: true
@@ -46,11 +46,11 @@ jobs:
       # `just check` needs both toolchains; `just bump` needs Cargo. rustfmt and
       # clippy are not part of the minimal profile `rustup` installs by default,
       # and the gate runs `cargo fmt --check` and `cargo clippy`.
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
           components: rustfmt, clippy
-      - uses: oven-sh/setup-bun@v2
-      - uses: extractions/setup-just@v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       # `semver-action` compares the commit range against `fallbackTag`, and its
       # compare call fails when that tag does not exist yet. Anchor the first
@@ -70,7 +70,7 @@ jobs:
       - name: Calculate Next SemVer
         if: (inputs.target || 'new-tag') == 'new-tag'
         id: semver
-        uses: ietf-tools/semver-action@v1
+        uses: ietf-tools/semver-action@c90370b2958652d71c06a3484129a4d423a6d8a8 # v1
         with:
           token: ${{ github.token }}
           fallbackTag: v0.0.0
@@ -144,12 +144,12 @@ jobs:
     if: needs.prepare.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.prepare.outputs.ref }}
           fetch-depth: 0
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
 
       - name: Build Linux x64 tarball
         run: |
@@ -159,7 +159,7 @@ jobs:
           tar -czvf dist/freshdesk-linux-x64.tar.gz -C target/release freshdesk
 
       - name: Upload build artifacts (always kept in the Actions run)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: build-artifacts-${{ needs.prepare.outputs.ref }}
           path: dist/
@@ -167,7 +167,7 @@ jobs:
 
       - name: Publish Consolidated Release
         if: needs.prepare.outputs.publish == 'true'
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           tag_name: ${{ needs.prepare.outputs.ref }}
           generate_release_notes: true

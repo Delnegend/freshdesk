@@ -14,17 +14,17 @@ RUN --mount=type=cache,target=/var/cache/apt \
     tcpdump iproute2 bind9-dnsutils jq && \
     rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -g 1000 freshdesk && \
-    useradd -m -u 1000 -g freshdesk -s /bin/bash freshdesk && \
-    echo "freshdesk ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/freshdesk && \
-    chmod 0440 /etc/sudoers.d/freshdesk && \
-    chsh -s /bin/bash freshdesk && \
+RUN groupadd -g 1000 dev && \
+    useradd -m -u 1000 -g dev -s /bin/bash dev && \
+    echo "dev ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/dev && \
+    chmod 0440 /etc/sudoers.d/dev && \
+    chsh -s /bin/bash dev && \
     mkdir -p /usr/local/cargo && \
-    chown -R freshdesk:freshdesk /usr/local/cargo && \
-    printf 'export PATH=/usr/local/cargo/bin:${PATH}\n' > /etc/profile.d/freshdesk-path.sh
+    chown -R dev:dev /usr/local/cargo && \
+    printf 'export PATH=/usr/local/cargo/bin:${PATH}\n' > /etc/profile.d/dev-path.sh
 
 SHELL ["/bin/bash", "-c"]
-USER freshdesk
+USER dev
 
 ENV CARGO_HOME=/usr/local/cargo
 ENV PATH="/usr/local/cargo/bin:${PATH}"

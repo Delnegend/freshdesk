@@ -3,8 +3,8 @@
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
-	"containerUser": "freshdesk",
-	"remoteUser": "freshdesk",
+	"containerUser": "dev",
+	"remoteUser": "dev",
 	"runArgs": [
 		"--hostname=freshdesk",
 		"--security-opt",

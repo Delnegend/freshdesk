@@ -1,0 +1,28 @@
+# OSV-Scanner configuration.
+#
+# zip is a transitive dependency of rust_xlsxwriter (the Excel report export).
+# All three advisories below affect archive *extraction* only
+# (ZipArchive::extract / ZipStreamReader::extract: symlink targets, SUID/SGID
+# bits, unconfined permission application). freshdesk only writes xlsx
+# workbooks and never extracts archives, so the vulnerable code paths are
+# unreachable.
+#
+# There is no updatable fix yet: rust_xlsxwriter 0.99.1 (latest, 2026-09-14)
+# requires zip 8.x, so zip 9.0.0 cannot be selected. Revisit when
+# rust_xlsxwriter supports zip >= 9 — that needs a manual Cargo.toml bump,
+# since the dependency-update workflow does not cross the 0.99 -> 0.100 break.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0367" # insecure SUID/SGID preservation during extraction
+ignoreUntil = 2026-11-15
+reason = "extract()-only advisory; rust_xlsxwriter is used write-only and no archive is ever extracted"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0368" # extract() creates symlinks with attacker-controlled targets
+ignoreUntil = 2026-11-15
+reason = "extract()-only advisory; rust_xlsxwriter is used write-only and no archive is ever extracted"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0369" # permissions applied through symlinks without confining the target
+ignoreUntil = 2026-11-15
+reason = "extract()-only advisory; rust_xlsxwriter is used write-only and no archive is ever extracted"

@@ -8,3 +8,4 @@ Welcome to the Freshdesk Rust Client & CLI documentation.
 - [Authentication Guide](authentication.md): Agent login automation, reCAPTCHA solver, TOTP 2FA, session caching, and API keys.
 - [Quarterly Report Generation](reports.md): Generating Excel quarterly reports, dynamic `SUMIF` formulas, and checkbox layouts.
 - [CI/CD & Autonomous Upgrades](ci-cd.md): GitHub Actions workflows, single-gate `just check`, 14-day package-manager dependency cooldown, and the scheduled/manual release pipeline.
+- [Reference Examples](examples.md): one-off generalized harnesses in `examples/` — arbitrary date-range Excel reports and per-agent thread audits.

@@ -6,7 +6,7 @@ use url::Url;
 
 use crate::auth::AuthMethod;
 use crate::error::{FreshdeskError, Result};
-use crate::models::{Agent, SearchResult, Ticket, TicketField};
+use crate::models::{Agent, Conversation, SearchResult, Ticket, TicketField};
 use crate::query::{GetTicketQuery, ListTicketsQuery, SearchTicketsQuery};
 
 const DEFAULT_USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -137,6 +137,44 @@ impl FreshdeskClient {
         let path = format!("api/v2/tickets/{}", id);
         let query_pairs = query.map(|q| q.to_query_pairs()).unwrap_or_default();
         self.get_json(&path, &query_pairs).await
+    }
+
+    /// List one page of a ticket's conversations (replies and notes).
+    ///
+    /// Corresponds to `GET /api/v2/tickets/{id}/conversations`. Pages hold up
+    /// to 30 entries; prefer [`Self::ticket_conversations`] for the full thread.
+    pub async fn list_ticket_conversations(
+        &self,
+        ticket_id: u64,
+        page: u32,
+    ) -> Result<Vec<Conversation>> {
+        let path = format!("api/v2/tickets/{}/conversations", ticket_id);
+        let page_str = page.to_string();
+        self.get_json(&path, &[("page", page_str)]).await
+    }
+
+    /// Fetch a ticket's full thread across pages (up to `max_pages`, default 10).
+    ///
+    /// Needed because `include=conversations` on [`Self::get_ticket`] truncates
+    /// long threads; this endpoint returns the complete history page by page.
+    pub async fn ticket_conversations(
+        &self,
+        ticket_id: u64,
+        max_pages: Option<u32>,
+    ) -> Result<Vec<Conversation>> {
+        let mut all = Vec::new();
+        for page in 1..=max_pages.unwrap_or(10).max(1) {
+            let batch = self.list_ticket_conversations(ticket_id, page).await?;
+            if batch.is_empty() {
+                break;
+            }
+            let short = batch.len() < 30;
+            all.extend(batch);
+            if short {
+                break;
+            }
+        }
+        Ok(all)
     }
 
     /// Get current authenticated agent information.

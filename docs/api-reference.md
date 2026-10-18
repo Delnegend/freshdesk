@@ -98,6 +98,15 @@ let query = GetTicketQuery::new().include(&[
 let ticket = client.get_ticket(82678, Some(&query)).await?;
 ```
 
+### `list_ticket_conversations` / `ticket_conversations`
+```rust
+pub async fn list_ticket_conversations(&self, ticket_id: u64, page: u32) -> Result<Vec<Conversation>>
+pub async fn ticket_conversations(&self, ticket_id: u64, max_pages: Option<u32>) -> Result<Vec<Conversation>>
+```
+Reads `GET /api/v2/tickets/{id}/conversations`, one page (30 entries) or the
+full thread. Use these instead of `include(Conversations)` on `get_ticket`
+for long threads — the embedded form truncates.
+
 ---
 
 ## 3. Component & Field Discovery

@@ -188,3 +188,13 @@ jobs:
       - name: Publish Consolidated Release
         if: needs.prepare.outputs.publish == 'true'
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        with:
+          # Without an explicit `tag_name` the action falls back to
+          # `github.ref`, which is `refs/heads/main` on both `schedule` and
+          # `workflow_dispatch` — so it fails with "GitHub Releases requires
+          # a tag". The tag is created by the prepare job, not by the ref.
+          tag_name: ${{ needs.prepare.outputs.ref }}
+          generate_release_notes: true
+          # Without this the Release is created with no assets attached;
+          # the tarball only ever reaches the run artifacts.
+          files: dist/*

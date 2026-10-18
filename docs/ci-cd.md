@@ -83,11 +83,7 @@ This repository implements the `autonomous-upgrade` workflow architecture for de
 
 ## 4. Release (`.github/workflows/release.yml`)
 
-- **Triggers**:
-  - `workflow_dispatch` with an optional `ref` (empty = ship a new version, commit SHA = test-build without publishing, version tag = rebuild it) and `dry-run` (preview each action without doing any of it).
-  - Weekly cron `0 0 * * 0` (Sunday 00:00 UTC), which ships unattended.
-- **Modes**: ship (CI gate → `just bump` → atomic commit + tag push → build → publish), rebuild (rebuild an existing tag and publish), and test-build (build any commit — uploading Actions artifacts only, never a release).
+- **Triggers**: `workflow_dispatch` (`ref` selects ship / test-build / rebuild, `dry-run` previews) and weekly cron `0 0 * * 0` (Sunday 00:00 UTC). Dispatch modes are shared ([Delnegend/actions](https://github.com/Delnegend/actions/blob/main/README.md)); versions come from Conventional Commits via `ietf-tools/semver-action@v1`.
 - **Concurrency**: `group: release-main`, `cancel-in-progress: false`.
-- **Version Calculation**: `ietf-tools/semver-action@v1` determines the next semantic version based on Conventional Commits since the last git tag (with fallback `v0.0.0`).
 - **Binary Packaging**: Compiles `target/release/freshdesk` and packages it into `dist/freshdesk-<version>-x86_64-unknown-linux-gnu.tar.xz`.
 - **Publishing**: `softprops/action-gh-release@v3` publishes the GitHub release with auto-generated release notes and attached binary asset.

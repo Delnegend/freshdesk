@@ -66,7 +66,7 @@ export FD_API_KEY="your_api_key"
 ```
 Or via CLI flag:
 ```bash
-cargo run -- --api-key "your_api_key" list
+./freshdesk --api-key "your_api_key" list
 ```
 
 ---

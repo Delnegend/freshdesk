@@ -15,14 +15,21 @@
 ## Quick Start
 
 ```bash
-# 1. Point it at your account
-cp .env.example .env   # then fill in FD_SERVER, FD_USER, FD_PASSWORD, FD_TOTP_SEED
+# 1. Install (Linux x64)
+URL=$(curl -fsSL https://api.github.com/repos/Delnegend/freshdesk/releases/latest | grep -o 'https://[^"]*x86_64-unknown-linux-gnu\.tar\.xz')
+curl -fsSL -o freshdesk.tar.xz "$URL" && tar -xJf freshdesk.tar.xz --strip-components=1
 
-# 2. Log in (solves the invisible challenge, stores a session cookie)
-cargo run -- login
+# 2. Point it at your account (all keys: docs/configuration.md)
+cat > .env <<EOF
+FD_SERVER=your-account.freshdesk.com
+FD_USER=you@company.com
+FD_PASSWORD=...
+FD_TOTP_SEED=...
+EOF
 
-# 3. List your open tickets
-cargo run -- list --filter new-and-my-open --per-page 10
+# 3. Log in, then list your open tickets
+./freshdesk login
+./freshdesk list --filter new-and-my-open --per-page 10
 ```
 
 ## Highlights
@@ -35,9 +42,9 @@ cargo run -- list --filter new-and-my-open --per-page 10
 ## Common Options
 
 ```bash
-cargo run -- list --properties --json
-cargo run -- search --component <product> --properties --json
-cargo run -- report 2026Q3 --output my_report.xlsx
+./freshdesk list --properties --json
+./freshdesk search --component <product> --properties --json
+./freshdesk report 2026Q3 --output my_report.xlsx
 ```
 
 | Option | Default | Description |
@@ -65,7 +72,6 @@ Auth flow and client design: **[Architecture](docs/architecture.md)**. Library s
 - **[Commands](docs/commands.md)** — every subcommand and flag, verified against `--help`.
 - **[Configuration](docs/configuration.md)** — `.env` keys, CLI flags, catalog sync script.
 - **[Reports](docs/reports.md)** — quarterly Excel layout and formulas.
-- **[Library](docs/library.md)** — using the crate from your own Rust code.
 - **[Authentication](docs/authentication.md)** — login, API keys, session cookies.
 - **[Development](docs/development.md)** — gates, tests, live-test setup.
 

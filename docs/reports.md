@@ -7,7 +7,7 @@ This document explains the quarterly report generation mechanism, data aggregati
 The `report` subcommand generates an Excel report summarizing ticket volume and TTR (Time to Resolution) SLA performance grouped by product component (`_Components`):
 
 ```bash
-cargo run -- report 2026Q3
+./freshdesk report 2026Q3
 ```
 
 ---

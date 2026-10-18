@@ -1,8 +1,8 @@
 # Rust Library API Reference
 
 This document covers the public Rust API exposed by the `freshdesk` crate.
-
-## Quick Import
+Types are exact; the prose below is verified against `src/client.rs`,
+`src/query.rs`, and `src/auth.rs`.
 
 ```rust
 use freshdesk::{
@@ -14,17 +14,22 @@ use freshdesk::{
 };
 ```
 
----
+## Client Creation
 
-## 1. Client Creation
+From `.env` + the session file: server, auth, domain auto-resolution.
 
-### `FreshdeskClient::from_env()`
 ```rust
-pub async fn from_env() -> Result<Self>
+let client = FreshdeskClient::from_env().await?;
 ```
-Initializes client using environment variables (`FD_SERVER`, `FD_API_KEY`, `FD_SESSION_COOKIE`, `FD_USER`, `FD_PASSWORD`, `FD_TOTP_SEED`) and cached session files. Automatically discovers canonical Freshdesk domains. `FD_SERVER` is **required** — there is no built-in default, since the target account is deployment-specific.
 
-### `FreshdeskClient::builder()`
+`from_env()` needs `FD_SERVER` (required); authentication comes from
+`FD_API_KEY`, `FD_SESSION_COOKIE`, or `FD_USER` + `FD_PASSWORD` +
+`FD_TOTP_SEED`. Missing credentials fail at `from_env()` time, not on first
+call. `FD_SERVER` has no built-in default, since the target account is
+deployment-specific.
+
+Explicit: pick the server, the auth method, and domain resolution.
+
 ```rust
 let client = FreshdeskClient::builder()
     .server("your-account.freshdesk.com")
@@ -34,15 +39,7 @@ let client = FreshdeskClient::builder()
     .await?;
 ```
 
----
-
-## 2. Ticket Retrieval
-
-### `list_tickets`
-```rust
-pub async fn list_tickets(&self, query: &ListTicketsQuery) -> Result<Vec<Ticket>>
-```
-Fetches tickets matching standard filter criteria:
+## Ticket Retrieval
 
 ```rust
 let query = ListTicketsQuery::new()
@@ -52,104 +49,47 @@ let query = ListTicketsQuery::new()
     .order_type(OrderType::Desc)
     .include(&[ListInclude::Requester, ListInclude::Stats]);
 
-let tickets = client.list_tickets(&query).await?;
-```
+let tickets: Vec<Ticket> = client.list_tickets(&query).await?;
 
-### `search_tickets`
-```rust
-pub async fn search_tickets(&self, query: &SearchTicketsQuery) -> Result<SearchResult<Ticket>>
-```
-Searches tickets using Freshdesk query syntax. Returns total count and current page results:
-
-```rust
-let query = SearchTicketsQuery::builder()
+let search = SearchTicketsQuery::builder()
     .component("your-product")
     .created_after("2026-09-01")
     .created_before("2026-09-30")
     .status(7)
     .build();
-
-let result = client.search_tickets(&query).await?;
-println!("Total matching: {}", result.total);
-```
-
-### `search_all_tickets_paginated`
-```rust
-pub async fn search_all_tickets_paginated(
-    &self,
-    query: &SearchTicketsQuery,
-    max_pages: Option<u32>,
-) -> Result<Vec<Ticket>>
-```
-Paginates through search results automatically until all matching tickets are retrieved (up to the maximum 300 allowed by Freshdesk search).
-
-### `get_ticket`
-```rust
-pub async fn get_ticket(&self, id: u64, query: Option<&GetTicketQuery>) -> Result<Ticket>
-```
-Retrieves a single ticket by its ID, optionally embedding conversation notes:
-
-```rust
-let query = GetTicketQuery::new().include(&[
+let page = client.search_tickets(&search).await?;   // SearchResult<Ticket>: total + current page
+let all: Vec<Ticket> = client.search_all_tickets_paginated(&search, None).await?; // up to 300
+let one: Ticket = client.get_ticket(82678, Some(&GetTicketQuery::new().include(&[
     GetTicketInclude::Conversations,
     GetTicketInclude::Requester,
     GetTicketInclude::Stats,
-]);
-let ticket = client.get_ticket(82678, Some(&query)).await?;
+]))).await?;
 ```
 
-### `list_ticket_conversations` / `ticket_conversations`
-```rust
-pub async fn list_ticket_conversations(&self, ticket_id: u64, page: u32) -> Result<Vec<Conversation>>
-pub async fn ticket_conversations(&self, ticket_id: u64, max_pages: Option<u32>) -> Result<Vec<Conversation>>
-```
-Reads `GET /api/v2/tickets/{id}/conversations`, one page (30 entries) or the
-full thread. Use these instead of `include(Conversations)` on `get_ticket`
-for long threads — the embedded form truncates.
+`list_ticket_conversations` / `ticket_conversations` read
+`GET /api/v2/tickets/{id}/conversations`, one page or the full thread. Use
+these instead of `include(Conversations)` on `get_ticket` for long threads —
+the embedded form truncates.
 
----
+## Component & Field Discovery
 
-## 3. Component & Field Discovery
+`get_ticket_fields` retrieves full field schemas from
+`GET /api/v2/ticket_fields`. `get_components_choices` extracts the live
+product list from `cf__components` choices.
 
-### `get_ticket_fields`
-```rust
-pub async fn get_ticket_fields(&self) -> Result<Vec<TicketField>>
-```
-Retrieves full field schemas from `GET /api/v2/ticket_fields`.
+## Ticket Model & Extracted Properties
 
-### `get_components_choices`
-```rust
-pub async fn get_components_choices(&self) -> Result<Vec<String>>
-```
-Extracts the live product list from `cf__components` choices.
-
----
-
-## 4. Ticket Model & Extracted Properties
-
-The `Ticket` struct provides strongly-typed convenience accessors:
+The `Ticket` struct carries strongly-typed helpers over the raw fields
+(`l3` names the secondary escalation SLA the accessors also cover):
 
 ```rust
-// Creation timestamp
-let created: Option<DateTime<Utc>> = ticket.created_at();
-
-// Target TTR SLA deadline
-let ttr_due: Option<DateTime<Utc>> = ticket.ttr_time();
-
-// Human-readable remaining/elapsed time (e.g. "6d 23h 44m 36s")
-let ttr_str: Option<&str> = ticket.ttr_time_str();
-
-// True if overdue: TTR SLA **and** L3 escalation SLA were both breached
-let is_overdue: bool = ticket.ttr_overdue();
-
-// L3 escalation SLA, parsed into seconds
-let l3_allowed: Option<i64> = ticket.l3_time_allowed();   // "2d 18h" -> 237_600
-let l3_actual: Option<i64> = ticket.l3_time_actual();     // "10m 54s" -> 654
-let l3_breached: bool = ticket.l3_time_violated();        // actual > allowed
-
-// List of assigned product components (e.g. ["your-product"])
-let components: Vec<String> = ticket.components();
-
-// Consolidated summary
+let created: Option<DateTime<Utc>> = ticket.created_at();        // creation timestamp
+let ttr_due: Option<DateTime<Utc>> = ticket.ttr_time();          // SLA deadline (due_by)
+let ttr_str: Option<&str> = ticket.ttr_time_str();               // "6d 23h 44m 36s"
+let is_overdue: bool = ticket.ttr_overdue();                     // TTR SLA breached
+let l3_allowed: Option<i64> = ticket.l3_time_allowed();          // "2d 18h" -> 237_600
+let l3_actual: Option<i64> = ticket.l3_time_actual();            // "10m 54s" -> 654
+let l3_breached: bool = ticket.l3_time_violated();               // actual > allowed
+let components: Vec<String> = ticket.components();               // assigned products
 let summary: TicketSummaryProperties = ticket.summary_properties();
 ```

@@ -35,7 +35,7 @@ This repository implements the `autonomous-upgrade` workflow architecture for de
 | - Triggers: workflow_dispatch (new-tag/tag/commit)        |
 |   and weekly cron 0 0 * * 0 (Sunday 00:00 UTC)            |
 | - ietf-tools/semver-action derives version from commits   |
-| - Compiles release binary: freshdesk-linux-x64.tar.gz     |
+| - Compiles release binary: freshdesk-<version>-x86_64-unknown-linux-gnu.tar.xz |
 | - Publishes GitHub Release with generated release notes   |
 +-----------------------------------------------------------+
 ```
@@ -89,5 +89,5 @@ This repository implements the `autonomous-upgrade` workflow architecture for de
 - **Targets**: `new-tag` (CI gate → `just bump` → atomic commit + tag push → build → publish), `tag` (rebuild an existing tag, defaulting to the latest semver tag, and publish), and `commit` (test build of the latest commit — or a given SHA — uploading Actions artifacts only, never a release).
 - **Concurrency**: `group: release-main`, `cancel-in-progress: false`.
 - **Version Calculation**: `ietf-tools/semver-action@v1` determines the next semantic version based on Conventional Commits since the last git tag (with fallback `v0.0.0`).
-- **Binary Packaging**: Compiles `target/release/freshdesk` and packages it into `dist/freshdesk-linux-x64.tar.gz`.
+- **Binary Packaging**: Compiles `target/release/freshdesk` and packages it into `dist/freshdesk-<version>-x86_64-unknown-linux-gnu.tar.xz`.
 - **Publishing**: `softprops/action-gh-release@v3` publishes the GitHub release with auto-generated release notes and attached binary asset.

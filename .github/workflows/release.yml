@@ -1,11 +1,5 @@
 name: Release / Build Artifacts
 
-# Solo-dev maintenance flow: one run, zero clicks on the happy path.
-# Sunday cron (or a manual run) gates on all of CI, then bumps, tags,
-# pushes, builds, and ships. No PR, no second run, no PAT.
-#
-# Branch protection keeps force-push/deletion/linear-history guards but
-# requires no status checks, so the bot pushes the bump straight to main.
 on:
   workflow_dispatch:
     inputs:
@@ -29,7 +23,6 @@ permissions:
   contents: write
 
 jobs:
-  # Every CI job must pass before anything ships.
   gate:
     name: Gate (all of CI)
     uses: ./.github/workflows/ci.yml
@@ -95,10 +88,6 @@ jobs:
           set -euo pipefail
           cargo build --release --bin freshdesk
 
-      # Names the archive `<name>-<version>-<target>.<ext>` and writes it to
-      # dist/, where the publish step below picks it up. Format, effort and
-      # layout are the action's decision, not this file's. Upload is off: the
-      # next step already keeps dist/ in the run.
       - name: Package artifact
         uses: Delnegend/actions/package-artifact@3914bdd59116118eb4a7bad3cb2c4a04ab380b64 # v1
         with:
@@ -120,11 +109,7 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           # Without an explicit `tag_name` the action falls back to
-          # `github.ref`, which is `refs/heads/main` on both `schedule` and
-          # `workflow_dispatch` — so it fails with "GitHub Releases requires
-          # a tag". The tag is created by the prepare job, not by the ref.
+          # `github.ref` and fails: the tag lives in prepare, not the ref.
           tag_name: ${{ needs.prepare.outputs.ref }}
           generate_release_notes: true
-          # Without this the Release is created with no assets attached;
-          # the tarball only ever reaches the run artifacts.
           files: dist/*

@@ -58,7 +58,7 @@ jobs:
 
       - name: Bump, tag, and push
         id: resolve
-        uses: Delnegend/actions/resolve-release@95dff8c808d26b0b4b849450d90652b9b4aca685 # v1
+        uses: Delnegend/actions/resolve-release@0e55ed74d7039e8f1f5b23607345eefaef65d8b4 # v1
         with:
           ref: ${{ inputs.ref }}
           dry-run: ${{ inputs.dry-run }}
@@ -87,7 +87,7 @@ jobs:
           cargo build --release --bin freshdesk
 
       - name: Package artifact
-        uses: Delnegend/actions/package-artifact@95dff8c808d26b0b4b849450d90652b9b4aca685 # v1
+        uses: Delnegend/actions/package-artifact@0e55ed74d7039e8f1f5b23607345eefaef65d8b4 # v1
         with:
           name: freshdesk
           version: ${{ needs.prepare.outputs.version }}
@@ -102,12 +102,10 @@ jobs:
           path: dist/
           if-no-files-found: ignore
 
-      - name: Publish Consolidated Release
-        if: needs.prepare.outputs.publish == 'true'
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+      - name: Publish release
+        uses: Delnegend/actions/publish-release@0e55ed74d7039e8f1f5b23607345eefaef65d8b4 # v1
         with:
-          # Without an explicit `tag_name` the action falls back to
-          # `github.ref` and fails: the tag lives in prepare, not the ref.
-          tag_name: ${{ needs.prepare.outputs.ref }}
-          generate_release_notes: true
+          ref: ${{ needs.prepare.outputs.ref }}
+          publish: ${{ needs.prepare.outputs.publish }}
+          download: "false"
           files: dist/*

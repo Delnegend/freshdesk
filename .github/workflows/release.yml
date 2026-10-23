@@ -58,7 +58,7 @@ jobs:
 
       - name: Bump, tag, and push
         id: resolve
-        uses: Delnegend/actions/resolve-release@fd9a429325e7c9103399f01855023e6b394457a2 # v1
+        uses: Delnegend/actions/resolve-release@62064acc9dce2872175e85b3b2e1c2295cd1bee7 # v1
         with:
           ref: ${{ inputs.ref }}
           dry-run: ${{ inputs.dry-run }}
@@ -87,25 +87,21 @@ jobs:
           cargo build --release --bin freshdesk
 
       - name: Package artifact
-        uses: Delnegend/actions/package-artifact@fd9a429325e7c9103399f01855023e6b394457a2 # v1
+        uses: Delnegend/actions/package-artifact@62064acc9dce2872175e85b3b2e1c2295cd1bee7 # v1
         with:
           name: freshdesk
           version: ${{ needs.prepare.outputs.version }}
           target: x86_64-unknown-linux-gnu
           source: target/release/freshdesk
-          upload: "false"
 
-      - name: Upload build artifacts (always kept in the Actions run)
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: build-artifacts-${{ needs.prepare.outputs.ref }}
-          path: dist/
-          if-no-files-found: ignore
-
+  publish:
+    name: Publish Consolidated Release
+    needs: [prepare, build]
+    if: needs.prepare.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    steps:
       - name: Publish release
-        uses: Delnegend/actions/publish-release@fd9a429325e7c9103399f01855023e6b394457a2 # v1
+        uses: Delnegend/actions/publish-release@62064acc9dce2872175e85b3b2e1c2295cd1bee7 # v1
         with:
           ref: ${{ needs.prepare.outputs.ref }}
           publish: ${{ needs.prepare.outputs.publish }}
-          download: "false"
-          files: dist/*

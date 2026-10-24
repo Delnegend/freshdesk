@@ -1,6 +1,6 @@
 # CI/CD & Autonomous Upgrades
 
-This repository implements the `autonomous-upgrade` workflow architecture for dependency updates, continuous verification, and release automation (manual dispatch or weekly schedule), running in maintenance mode.
+This repository implements the `ci-cd` workflow architecture for dependency updates, continuous verification, and release automation (manual dispatch or weekly schedule), running in maintenance mode.
 
 ## Workflows Overview
 

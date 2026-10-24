@@ -44,13 +44,11 @@ pub fn parse_duration(input: &str) -> Option<i64> {
     let mut saw_token = false;
 
     while idx < bytes.len() {
-        // Skip separators between tokens.
         if bytes[idx] == b' ' {
             idx += 1;
             continue;
         }
 
-        // Parse the count.
         let count_start = idx;
         while idx < bytes.len() && bytes[idx].is_ascii_digit() {
             idx += 1;
@@ -61,7 +59,6 @@ pub fn parse_duration(input: &str) -> Option<i64> {
         }
         let count: i64 = body[count_start..idx].parse().ok()?;
 
-        // Parse the unit suffix.
         if idx >= bytes.len() {
             return None;
         }

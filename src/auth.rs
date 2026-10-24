@@ -33,7 +33,6 @@ impl AuthMethod {
     /// 3. Existing session file (`.freshdesk_session.json` in cwd or `~/.freshdesk_session.json`).
     /// 4. Auto-login via `scripts/login.ts` if credentials exist in `.env` or environment.
     pub async fn auto_resolve() -> Result<Self> {
-        // 1. Check for API key
         if let Ok(api_key) = std::env::var("FD_API_KEY") {
             let trimmed = api_key.trim();
             if !trimmed.is_empty() {
@@ -42,7 +41,6 @@ impl AuthMethod {
             }
         }
 
-        // 2. Check for direct session cookie header
         if let Ok(cookie) = std::env::var("FD_SESSION_COOKIE") {
             let trimmed = cookie.trim();
             if !trimmed.is_empty() {
@@ -51,7 +49,6 @@ impl AuthMethod {
             }
         }
 
-        // 3. Check for existing session file
         if let Some(session_path) = find_session_file()
             && let Ok(cookie_header) = read_session_file(&session_path)
         {
@@ -59,7 +56,6 @@ impl AuthMethod {
             return Ok(Self::SessionCookie(cookie_header));
         }
 
-        // 4. Try running login helper if credentials are present
         if has_login_credentials() {
             info!("No valid session found; triggering automated agent login...");
             let cookie_header = run_login_helper().await?;
@@ -74,13 +70,11 @@ impl AuthMethod {
 
 /// Look for `.freshdesk_session.json` in current dir or home dir.
 pub fn find_session_file() -> Option<PathBuf> {
-    // Current directory
     let cwd_path = PathBuf::from(".freshdesk_session.json");
     if cwd_path.is_file() {
         return Some(cwd_path);
     }
 
-    // Home directory
     if let Ok(home) = std::env::var("HOME") {
         let home_path = PathBuf::from(home).join(".freshdesk_session.json");
         if home_path.is_file() {

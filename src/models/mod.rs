@@ -88,7 +88,6 @@ pub struct Ticket {
     #[serde(default)]
     pub custom_fields: Option<HashMap<String, serde_json::Value>>,
 
-    // Embedded objects (when include=... is passed)
     #[serde(default)]
     pub requester: Option<Requester>,
 

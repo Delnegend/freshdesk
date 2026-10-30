@@ -1,0 +1,13 @@
+# CVE-2026-115905: inconsistent ZIP headers can bypass inspection before
+# streaming extraction. freshdesk only writes xlsx workbooks and never extracts
+# archives. Upgrade rust_xlsxwriter and zip after their 14-day quarantine
+# (zip 9.0.5 is eligible 2026-10-31 18:45 UTC), then remove this exception.
+CVE-2026-115905 exp:2026-11-15
+
+# CVE-2026-115907 (GHSA-9hj8-73fh-9963): legacy decoder allocation during extraction.
+# CVE-2026-115908 (GHSA-hjqx-j4rw-g7xv): symlink escape during extraction.
+# CVE-2026-115909 (GHSA-q7v9-x93c-xqv3): symlink target allocation during extraction.
+# None applies to write-only workbook generation; remove after the upgrade above.
+CVE-2026-115907 exp:2026-11-15
+CVE-2026-115908 exp:2026-11-15
+CVE-2026-115909 exp:2026-11-15

@@ -1,16 +1,15 @@
 # OSV-Scanner configuration.
 #
 # zip is a transitive dependency of rust_xlsxwriter (the Excel report export).
-# All three advisories below affect archive *extraction* only
-# (ZipArchive::extract / ZipStreamReader::extract: symlink targets, SUID/SGID
-# bits, unconfined permission application). freshdesk only writes xlsx
-# workbooks and never extracts archives, so the vulnerable code paths are
-# unreachable.
+# The advisories below affect archive reading or extraction (including AES
+# authentication, legacy decoding, symlink targets and permissions).
+# freshdesk only writes xlsx workbooks; it does not read, decrypt or extract
+# archives, so these vulnerable code paths are unreachable.
 #
-# There is no updatable fix yet: rust_xlsxwriter 0.99.1 (latest, 2026-09-14)
-# requires zip 8.x, so zip 9.0.0 cannot be selected. Revisit when
-# rust_xlsxwriter supports zip >= 9 — that needs a manual Cargo.toml bump,
-# since the dependency-update workflow does not cross the 0.99 -> 0.100 break.
+# Upgrade rust_xlsxwriter to 0.100.0 and zip to at least 9.0.5 after both
+# pass the 14-day quarantine (2026-10-31 18:45 UTC for zip 9.0.5).
+# The 0.99 -> 0.100 change needs a manual Cargo.toml bump; remove the
+# temporary exceptions after upgrading.
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0367" # insecure SUID/SGID preservation during extraction
@@ -26,3 +25,28 @@ reason = "extract()-only advisory; rust_xlsxwriter is used write-only and no arc
 id = "RUSTSEC-2026-0369" # permissions applied through symlinks without confining the target
 ignoreUntil = 2026-11-15
 reason = "extract()-only advisory; rust_xlsxwriter is used write-only and no archive is ever extracted"
+
+[[IgnoredVulns]]
+id = "GHSA-m665-v7pm-7grj" # inconsistent ZIP headers can bypass inspection before extraction
+ignoreUntil = 2026-11-15
+reason = "extraction-only advisory; rust_xlsxwriter is used write-only and no archive is ever extracted"
+
+[[IgnoredVulns]]
+id = "GHSA-8hxf-qr8p-62x4" # AES entry authentication bypass on premature EOF
+ignoreUntil = 2026-11-15
+reason = "AES ZIP entry decryption is not used; rust_xlsxwriter only writes workbooks"
+
+[[IgnoredVulns]]
+id = "GHSA-9hj8-73fh-9963" # legacy ZIP decoder allocation on extraction
+ignoreUntil = 2026-11-15
+reason = "legacy ZIP extraction is not used; rust_xlsxwriter only writes workbooks"
+
+[[IgnoredVulns]]
+id = "GHSA-hjqx-j4rw-g7xv" # symlink escape during extraction
+ignoreUntil = 2026-11-15
+reason = "ZIP extraction is not used; rust_xlsxwriter only writes workbooks"
+
+[[IgnoredVulns]]
+id = "GHSA-q7v9-x93c-xqv3" # unbounded symlink target allocation during extraction
+ignoreUntil = 2026-11-15
+reason = "ZIP extraction is not used; rust_xlsxwriter only writes workbooks"

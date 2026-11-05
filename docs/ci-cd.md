@@ -61,7 +61,7 @@ This repository implements the `ci-cd` workflow architecture for dependency upda
 - **Trigger**: daily `0 2 * * *` (02:00 UTC), plus `workflow_dispatch`.
 - Runs `cargo update` and `bun update`, so each package manager applies its own release cooldown rather than a workflow-level gate.
 - **Cooldown**: 14 days, enforced by `.cargo/config.toml` (`global-min-publish-age = "14 days"`, requires Cargo ≥ 1.100) and `bunfig.toml` (`minimumReleaseAge = 1209600`). Versions published less than two weeks ago are skipped.
-- Opens — or force-pushes — a single `deps/automatic` PR labelled `dependencies`, titled `chore(deps): upgrade dependencies`. A run with no changes opens nothing.
+- Opens or force-pushes a single `deps/automatic` PR labelled `dependencies`, titled `chore(deps): upgrade dependencies`. A run with no changes opens nothing.
 
 ### 2.2 Dependabot (`.github/dependabot.yml`)
 
@@ -77,7 +77,7 @@ This repository implements the `ci-cd` workflow architecture for dependency upda
 - **Trigger**: `pull_request` targeting `main`.
 - Runs only when the PR carries the `dependencies` label.
 - Enables `gh pr merge --auto --rebase`, so the PR rebases and merges as soon as the CI gate passes.
-- Keys on the label alone — it does **not** read Dependabot metadata — so any labelled PR is eligible regardless of author.
+- Keys on the label alone (it does **not** read Dependabot metadata), so any labelled PR is eligible regardless of author.
 
 ---
 

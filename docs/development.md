@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Rust 1.85+** (edition 2024) and **Bun 1.x** — the CLI is Rust; the catalog
+- **Rust 1.85+** (edition 2024) and **Bun 1.x**: the CLI is Rust; the catalog
   sync and session helpers are TypeScript run with `bun run`.
 - Native TLS: the default `rustls-tls` build needs nothing extra beyond a C
   toolchain.
@@ -26,7 +26,7 @@ cargo test --test live_tests -- --nocapture   # against the live instance
 ```
 
 `tests/component_tests.rs` asserts the upstream `_Components` catalog still
-matches the `.env` baseline — an added, removed, or renamed product fails the
+matches the `.env` baseline; an added, removed, or renamed product fails the
 suite immediately.
 
 ## CI

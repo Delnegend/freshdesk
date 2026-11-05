@@ -186,7 +186,7 @@ fn render_markdown(
         hits.iter().map(|h| h.entries.len()).sum::<usize>()
     );
     for h in hits {
-        let _ = writeln!(out, "## {} — {}", h.id, h.subject);
+        let _ = writeln!(out, "## {}: {}", h.id, h.subject);
         let _ = writeln!(out, "Created {} | Status: {}", h.created, h.status);
         for e in &h.entries {
             let kind = if e.private {

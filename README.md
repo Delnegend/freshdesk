@@ -2,7 +2,7 @@
 
 # Freshdesk
 
-**Freshdesk API client and CLI in Rust — tickets, TOTP agent login, quarterly SLA reports.**
+**Freshdesk API client and CLI in Rust: tickets, TOTP agent login, quarterly SLA reports.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Delnegend/freshdesk/ci.yml?branch=main&style=flat-square)](https://github.com/Delnegend/freshdesk/actions)
 [![Release](https://img.shields.io/github/v/release/Delnegend/freshdesk?style=flat-square)](https://github.com/Delnegend/freshdesk/releases)
@@ -34,10 +34,10 @@ EOF
 
 ## Highlights
 
-- **Agent login without the browser dance** — credentials plus TOTP seed refresh the session automatically.
-- **SLA fields computed for you** — TTR deadline, remaining time, and overdue flags on every ticket.
-- **Quarterly reports as real spreadsheets** — per-product overdue counts with `IF`/`SUMIF` formulas and clickable in-charge checkboxes.
-- **No tenant data baked in** — product catalog and checkboxes come from your `.env`, never the source.
+- **Agent login without the browser dance**: credentials plus TOTP seed refresh the session automatically.
+- **SLA fields computed for you**: TTR deadline, remaining time, and overdue flags on every ticket.
+- **Quarterly reports as real spreadsheets**: per-product overdue counts with `IF`/`SUMIF` formulas and clickable in-charge checkboxes.
+- **No tenant data baked in**: product catalog and checkboxes come from your `.env`, never the source.
 
 ## Common Options
 
@@ -69,11 +69,11 @@ Auth flow and client design: **[Architecture](docs/architecture.md)**. Library s
 
 ## Documentation
 
-- **[Commands](docs/commands.md)** — every subcommand and flag, verified against `--help`.
-- **[Configuration](docs/configuration.md)** — `.env` keys, CLI flags, catalog sync script.
-- **[Reports](docs/reports.md)** — quarterly Excel layout and formulas.
-- **[Authentication](docs/authentication.md)** — login, API keys, session cookies.
-- **[Development](docs/development.md)** — gates, tests, live-test setup.
+- **[Commands](docs/commands.md)**: every subcommand and flag, verified against `--help`.
+- **[Configuration](docs/configuration.md)**: `.env` keys, CLI flags, catalog sync script.
+- **[Reports](docs/reports.md)**: quarterly Excel layout and formulas.
+- **[Authentication](docs/authentication.md)**: login, API keys, session cookies.
+- **[Development](docs/development.md)**: gates, tests, live-test setup.
 
 ## License
 

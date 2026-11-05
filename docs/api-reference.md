@@ -68,7 +68,7 @@ let one: Ticket = client.get_ticket(82678, Some(&GetTicketQuery::new().include(&
 
 `list_ticket_conversations` / `ticket_conversations` read
 `GET /api/v2/tickets/{id}/conversations`, one page or the full thread. Use
-these instead of `include(Conversations)` on `get_ticket` for long threads —
+these instead of `include(Conversations)` on `get_ticket` for long threads;
 the embedded form truncates.
 
 ## Component & Field Discovery

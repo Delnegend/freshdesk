@@ -44,9 +44,9 @@ Generated using [`rust_xlsxwriter`](https://crates.io/crates/rust_xlsxwriter):
 
 A ticket is counted as overdue only when **both** criteria hold:
 
-1. **TTR overdue** — `cf_ttr_overdue` is `Yes` (or, when that field is absent,
+1. **TTR overdue**: `cf_ttr_overdue` is `Yes` (or, when that field is absent,
    `due_by` has passed for a ticket that is not yet Resolved/Closed).
-2. **L3 escalation breached** — `_L3 Time Actual` > `_L3 Time Allowed`
+2. **L3 escalation breached**: `_L3 Time Actual` > `_L3 Time Allowed`
    (`cf__l3_time_actual` vs `cf__l3_time_allowed`), compared as parsed
    durations. A ticket missing either value fails this criterion.
 

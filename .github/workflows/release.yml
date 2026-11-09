@@ -87,7 +87,7 @@ jobs:
           cargo build --release --bin freshdesk
 
       - name: Package artifact
-        uses: Delnegend/actions/package-artifact@62064acc9dce2872175e85b3b2e1c2295cd1bee7 # v1
+        uses: Delnegend/actions/package-artifact@c6a6933ee3cde8baa3ac13e0366c81ac833c1d18 # v1
         with:
           name: freshdesk
           version: ${{ needs.prepare.outputs.version }}

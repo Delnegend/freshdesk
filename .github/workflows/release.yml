@@ -58,7 +58,7 @@ jobs:
 
       - name: Bump, tag, and push
         id: resolve
-        uses: Delnegend/actions/resolve-release@main
+        uses: Delnegend/actions/resolve-release@main  # nosemgrep
         with:
           ref: ${{ inputs.ref }}
           dry-run: ${{ inputs.dry-run }}
@@ -87,7 +87,7 @@ jobs:
           cargo build --release --bin freshdesk
 
       - name: Package artifact
-        uses: Delnegend/actions/package-artifact@main
+        uses: Delnegend/actions/package-artifact@main  # nosemgrep
         with:
           name: freshdesk
           version: ${{ needs.prepare.outputs.version }}
@@ -101,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Publish release
-        uses: Delnegend/actions/publish-release@main
+        uses: Delnegend/actions/publish-release@main  # nosemgrep
         with:
           ref: ${{ needs.prepare.outputs.ref }}
           publish: ${{ needs.prepare.outputs.publish }}

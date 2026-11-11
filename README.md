@@ -6,7 +6,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Delnegend/freshdesk/ci.yml?branch=main&style=flat-square)](https://github.com/Delnegend/freshdesk/actions)
 [![Release](https://img.shields.io/github/v/release/Delnegend/freshdesk?style=flat-square)](https://github.com/Delnegend/freshdesk/releases)
-[![License](https://img.shields.io/github/license/Delnegend/freshdesk?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 </div>
 
@@ -39,41 +39,11 @@ EOF
 - **Quarterly reports as real spreadsheets**: per-product overdue counts with `IF`/`SUMIF` formulas and clickable in-charge checkboxes.
 - **No tenant data baked in**: product catalog and checkboxes come from your `.env`, never the source.
 
-## Common Options
-
-```bash
-./freshdesk list --properties --json
-./freshdesk search --component <product> --properties --json
-./freshdesk report 2026Q3 --output my_report.xlsx
-```
-
-| Option | Default | Description |
-|---|---|---|
-| `--properties` | off | Key fields only: TTR, overdue, components, created-at |
-| `--json` | off | Raw JSON for `jq` (on list, search, get, me, components) |
-| `--output <file>` | `<QUARTER>_report.xlsx` | Report path (report only) |
-
-Flag details, auth methods, and the Excel layout: **[Configuration](docs/configuration.md)** and **[Commands](docs/commands.md)**.
-
-## Architecture
-
-```mermaid
-flowchart LR
-    CLI[Rust CLI] --> Auth[TOTP login / session]
-    CLI --> Client[FreshdeskClient]
-    Client --> API[Freshdesk REST v2]
-    Client --> Report[XLSX report builder]
-```
-
-Auth flow and client design: **[Architecture](docs/architecture.md)**. Library surface: **[API Reference](docs/api-reference.md)**.
-
 ## Documentation
 
-- **[Commands](docs/commands.md)**: every subcommand and flag, verified against `--help`.
-- **[Configuration](docs/configuration.md)**: `.env` keys, CLI flags, catalog sync script.
-- **[Reports](docs/reports.md)**: quarterly Excel layout and formulas.
-- **[Authentication](docs/authentication.md)**: login, API keys, session cookies.
-- **[Development](docs/development.md)**: gates, tests, live-test setup.
+- **[Architecture](docs/architecture.md)**: Auth flow, domain auto-discovery, and client design.
+- **[Development](docs/development.md)**: Gate commands, unit tests, live-server integration setup, and CI workflow.
+- **[Deployment](docs/deployment.md)**: Installation via Homebrew, binary archives, .env configuration, and cron automation.
 
 ## License
 

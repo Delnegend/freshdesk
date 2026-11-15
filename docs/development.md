@@ -2,10 +2,14 @@
 
 ## Prerequisites
 
-- **Rust 1.85+** (edition 2024) and **Bun 1.x**: the CLI is Rust; the catalog
+- **Rust 1.88+** (edition 2024) and **Bun 1.x**: the CLI is Rust; the catalog
   sync and session helpers are TypeScript run with `bun run`.
 - Native TLS: the default `rustls-tls` build needs nothing extra beyond a C
   toolchain.
+
+Cargo's registry configuration quarantines newly published crate versions for
+14 days. Excel report generation uses `rust_xlsxwriter` and its transitive
+`zip` dependency; keep both eligible under that policy when updating them.
 
 ## Gates
 

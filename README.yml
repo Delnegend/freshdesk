@@ -36,8 +36,8 @@ highlights:
 
 documentation:
   architecture: "Auth flow, domain auto-discovery, and client design."
-  development: "Gate commands, unit tests, live-server integration setup, and CI workflow."
-  deployment: "Installation via Homebrew, binary archives, .env configuration, and cron automation."
+  development: "Gate commands and [CI/CD](docs/ci-cd.md); see the [documentation index](docs/README.md), [API reference](docs/api-reference.md), [commands](docs/commands.md), [examples](docs/examples.md), and [reports](docs/reports.md)."
+  deployment: "Installation, [configuration](docs/configuration.md), and [authentication](docs/authentication.md)."
 
 license:
   type:

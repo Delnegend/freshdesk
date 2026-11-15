@@ -42,8 +42,8 @@ EOF
 ## Documentation
 
 - **[Architecture](docs/architecture.md)**: Auth flow, domain auto-discovery, and client design.
-- **[Development](docs/development.md)**: Gate commands, unit tests, live-server integration setup, and CI workflow.
-- **[Deployment](docs/deployment.md)**: Installation via Homebrew, binary archives, .env configuration, and cron automation.
+- **[Development](docs/development.md)**: Gate commands and [CI/CD](docs/ci-cd.md); see the [documentation index](docs/README.md), [API reference](docs/api-reference.md), [commands](docs/commands.md), [examples](docs/examples.md), and [reports](docs/reports.md).
+- **[Deployment](docs/deployment.md)**: Installation, [configuration](docs/configuration.md), and [authentication](docs/authentication.md).
 
 ## License
 

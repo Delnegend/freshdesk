@@ -10,7 +10,11 @@
 //! cargo run --example range_report -- --from 2026-07-30 --to 2026-10-14 --output range.xlsx
 //! ```
 
-use chrono::{NaiveDate, TimeDelta};
+use time::format_description::FormatItem;
+use time::macros::format_description;
+use time::{Date, Duration as TimeDelta};
+
+const DATE_FORMAT: &[FormatItem<'_>] = format_description!("[year]-[month]-[day]");
 use rust_xlsxwriter::{Color, Format, FormatAlign, FormatBorder, Workbook};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -42,8 +46,8 @@ impl ProductRow {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = dotenvy::dotenv();
 
-    let mut from: Option<NaiveDate> = None;
-    let mut to: Option<NaiveDate> = None;
+    let mut from: Option<Date> = None;
+    let mut to: Option<Date> = None;
     let mut output: Option<String> = None;
 
     let mut args = std::env::args().skip(1);
@@ -66,17 +70,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Same convention as Quarter::search_date_bounds: exclusive Lucene bounds
     // one day outside the inclusive range.
     let day_before = from
-        .checked_sub_signed(TimeDelta::days(1))
+        .checked_sub(TimeDelta::days(1))
         .ok_or("date underflow")?
-        .format("%Y-%m-%d")
-        .to_string();
+        .format(DATE_FORMAT)?;
     let day_after = to
-        .checked_add_signed(TimeDelta::days(1))
+        .checked_add(TimeDelta::days(1))
         .ok_or("date overflow")?
-        .format("%Y-%m-%d")
-        .to_string();
+        .format(DATE_FORMAT)?;
 
-    let range_code = format!("{}_to_{}", from.format("%Y-%m-%d"), to.format("%Y-%m-%d"));
+    let range_code = format!(
+        "{}_to_{}",
+        from.format(DATE_FORMAT)?,
+        to.format(DATE_FORMAT)?
+    );
     let output_path = output.unwrap_or_else(|| format!("{range_code}_report.xlsx"));
 
     println!("Collecting report data {from} .. {to} (inclusive)...");
@@ -162,10 +168,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn parse_date(value: Option<String>) -> Result<NaiveDate, Box<dyn std::error::Error>> {
+fn parse_date(value: Option<String>) -> Result<Date, Box<dyn std::error::Error>> {
     let raw = value.ok_or("missing date value")?;
-    NaiveDate::parse_from_str(&raw, "%Y-%m-%d")
-        .map_err(|e| format!("invalid date '{raw}': {e}").into())
+    Date::parse(&raw, DATE_FORMAT).map_err(|e| format!("invalid date '{raw}': {e}").into())
 }
 
 /// Same layout as `QuarterlyReportData::write_excel`, with a range-based sheet name.

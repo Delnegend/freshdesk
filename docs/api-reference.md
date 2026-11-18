@@ -82,9 +82,12 @@ product list from `cf__components` choices.
 The `Ticket` struct carries strongly-typed helpers over the raw fields
 (`l3` names the secondary escalation SLA the accessors also cover):
 
+Timestamp fields and `ListTicketsQuery::updated_since` use `time::OffsetDateTime`
+instead of `chrono::DateTime<Utc>`. JSON timestamps remain RFC 3339 strings.
+
 ```rust
-let created: Option<DateTime<Utc>> = ticket.created_at();        // creation timestamp
-let ttr_due: Option<DateTime<Utc>> = ticket.ttr_time();          // SLA deadline (due_by)
+let created: Option<OffsetDateTime> = ticket.created_at();       // creation timestamp
+let ttr_due: Option<OffsetDateTime> = ticket.ttr_time();         // SLA deadline (due_by)
 let ttr_str: Option<&str> = ticket.ttr_time_str();               // "6d 23h 44m 36s"
 let is_overdue: bool = ticket.ttr_overdue();                     // TTR SLA breached
 let l3_allowed: Option<i64> = ticket.l3_time_allowed();          // "2d 18h" -> 237_600

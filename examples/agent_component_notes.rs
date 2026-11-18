@@ -24,7 +24,12 @@
 use std::fmt::Write as _;
 use std::time::Duration;
 
-use chrono::{NaiveDate, TimeDelta};
+use time::format_description::FormatItem;
+use time::macros::format_description;
+use time::{Date, Duration as TimeDelta, OffsetDateTime, UtcOffset};
+
+const DATE_FORMAT: &[FormatItem<'_>] = format_description!("[year]-[month]-[day]");
+const ENTRY_FORMAT: &[FormatItem<'_>] = format_description!("[year]-[month]-[day] [hour]:[minute]");
 use freshdesk::FreshdeskClient;
 use freshdesk::query::SearchTicketsQuery;
 
@@ -48,8 +53,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = dotenvy::dotenv();
 
     let mut component: Option<String> = None;
-    let mut from: Option<NaiveDate> = None;
-    let mut to: Option<NaiveDate> = None;
+    let mut from: Option<Date> = None;
+    let mut to: Option<Date> = None;
     let mut output: Option<String> = None;
 
     let mut args = std::env::args().skip(1);
@@ -78,15 +83,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Same convention as Quarter::search_date_bounds: exclusive Lucene bounds
     // one day outside the inclusive range.
     let day_before = from
-        .checked_sub_signed(TimeDelta::days(1))
+        .checked_sub(TimeDelta::days(1))
         .ok_or("date underflow")?
-        .format("%Y-%m-%d")
-        .to_string();
+        .format(DATE_FORMAT)?;
     let day_after = to
-        .checked_add_signed(TimeDelta::days(1))
+        .checked_add(TimeDelta::days(1))
         .ok_or("date overflow")?
-        .format("%Y-%m-%d")
-        .to_string();
+        .format(DATE_FORMAT)?;
 
     println!("Scanning {component} tickets {from} .. {to} (inclusive)...");
 
@@ -112,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 entries.push(AgentEntry {
                     at: c
                         .created_at
-                        .map(|d| d.format("%Y-%m-%d %H:%M").to_string())
+                        .map(|d| format_utc(d, ENTRY_FORMAT))
                         .unwrap_or_else(|| "-".to_string()),
                     private: c.private.unwrap_or(false),
                     incoming: c.incoming.unwrap_or(false),
@@ -126,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 subject: t.subject.clone(),
                 created: t
                     .created_at
-                    .map(|d| d.format("%Y-%m-%d").to_string())
+                    .map(|d| format_utc(d, DATE_FORMAT))
                     .unwrap_or_else(|| "-".to_string()),
                 status: t.status_name().to_string(),
                 entries,
@@ -167,16 +170,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn parse_date(value: Option<String>) -> Result<NaiveDate, Box<dyn std::error::Error>> {
+fn format_utc(dt: OffsetDateTime, fmt: &[FormatItem<'_>]) -> String {
+    dt.to_offset(UtcOffset::UTC)
+        .format(fmt)
+        .unwrap_or_else(|_| "-".to_string())
+}
+
+fn parse_date(value: Option<String>) -> Result<Date, Box<dyn std::error::Error>> {
     let raw = value.ok_or("missing date value")?;
-    NaiveDate::parse_from_str(&raw, "%Y-%m-%d")
-        .map_err(|e| format!("invalid date '{raw}': {e}").into())
+    Date::parse(&raw, DATE_FORMAT).map_err(|e| format!("invalid date '{raw}': {e}").into())
 }
 
 fn render_markdown(
     component: &str,
-    from: NaiveDate,
-    to: NaiveDate,
+    from: Date,
+    to: Date,
     agent_id: u64,
     hits: &[HitTicket],
 ) -> String {

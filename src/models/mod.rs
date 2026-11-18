@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use time::OffsetDateTime;
 
 /// Represents a Freshdesk Ticket.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,18 +40,17 @@ pub struct Ticket {
     #[serde(default)]
     pub email_config_id: Option<u64>,
 
-    #[serde(default)]
-    pub created_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub created_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub updated_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub updated_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub due_by: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub due_by: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub fr_due_by: Option<DateTime<Utc>>,
-
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub fr_due_by: Option<OffsetDateTime>,
     #[serde(default)]
     pub is_escalated: Option<bool>,
 
@@ -144,13 +143,13 @@ impl Ticket {
     }
 
     /// Date of creation of the ticket (`created_at`).
-    pub fn created_at(&self) -> Option<DateTime<Utc>> {
+    pub fn created_at(&self) -> Option<OffsetDateTime> {
         self.created_at
     }
 
     /// TTR Time (Resolution Due Date).
     /// Corresponds to the target resolution deadline (`due_by`).
-    pub fn ttr_time(&self) -> Option<DateTime<Utc>> {
+    pub fn ttr_time(&self) -> Option<OffsetDateTime> {
         self.due_by
     }
 
@@ -210,7 +209,7 @@ impl Ticket {
             && self.status != 4
             && self.status != 5
         {
-            return due < Utc::now();
+            return due < OffsetDateTime::now_utc();
         }
         false
     }
@@ -281,8 +280,10 @@ impl Ticket {
 pub struct TicketSummaryProperties {
     pub id: u64,
     pub subject: String,
-    pub created_at: Option<DateTime<Utc>>,
-    pub ttr_time: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub created_at: Option<OffsetDateTime>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub ttr_time: Option<OffsetDateTime>,
     pub ttr_time_str: Option<String>,
     pub ttr_overdue: bool,
     pub components: Vec<String>,
@@ -341,39 +342,39 @@ pub struct Conversation {
     #[serde(default)]
     pub bcc_emails: Option<Vec<String>>,
 
-    #[serde(default)]
-    pub created_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub created_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub updated_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub updated_at: Option<OffsetDateTime>,
 }
 
 /// Represents Ticket statistics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TicketStats {
-    #[serde(default)]
-    pub agent_responded_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub agent_responded_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub requester_responded_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub requester_responded_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub first_responded_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub first_responded_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub status_updated_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub status_updated_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub reopened_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub reopened_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub resolved_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub resolved_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub closed_at: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub closed_at: Option<OffsetDateTime>,
 
-    #[serde(default)]
-    pub pending_since: Option<DateTime<Utc>>,
+    #[serde(default, with = "time::serde::rfc3339::option")]
+    pub pending_since: Option<OffsetDateTime>,
 }
 
 /// Represents a company.

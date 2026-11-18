@@ -10,6 +10,20 @@ use freshdesk::query::{
     GetTicketInclude, GetTicketQuery, ListInclude, ListTicketsQuery, OrderBy, OrderType,
     PredefinedFilter, SearchTicketsQuery,
 };
+use time::format_description::FormatItem;
+use time::macros::format_description;
+use time::{OffsetDateTime, UtcOffset};
+
+const DISPLAY_MINUTE_FORMAT: &[FormatItem<'_>] =
+    format_description!("[year]-[month]-[day] [hour]:[minute]");
+const DISPLAY_UTC_FORMAT: &[FormatItem<'_>] =
+    format_description!("[year]-[month]-[day] [hour]:[minute]:[second] UTC");
+
+fn format_utc(dt: OffsetDateTime, fmt: &[FormatItem<'_>]) -> String {
+    dt.to_offset(UtcOffset::UTC)
+        .format(fmt)
+        .unwrap_or_else(|_| "-".to_string())
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "freshdesk")]
@@ -628,16 +642,13 @@ fn print_tickets_table(tickets: &[Ticket]) {
 
         let created_str = t
             .created_at
-            .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
+            .map(|dt| format_utc(dt, DISPLAY_MINUTE_FORMAT))
             .unwrap_or_else(|| "-".to_string());
 
         let ttr_str = t
             .ttr_time_str()
             .map(|s| s.to_string())
-            .or_else(|| {
-                t.ttr_time()
-                    .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
-            })
+            .or_else(|| t.ttr_time().map(|dt| format_utc(dt, DISPLAY_MINUTE_FORMAT)))
             .unwrap_or_else(|| "-".to_string());
 
         let overdue_cell = if t.ttr_overdue() {
@@ -691,16 +702,13 @@ fn print_properties_table(props: &[TicketSummaryProperties]) {
     for p in props {
         let created_str = p
             .created_at
-            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+            .map(|dt| format_utc(dt, DISPLAY_UTC_FORMAT))
             .unwrap_or_else(|| "-".to_string());
 
         let ttr_str = p
             .ttr_time_str
             .clone()
-            .or_else(|| {
-                p.ttr_time
-                    .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
-            })
+            .or_else(|| p.ttr_time.map(|dt| format_utc(dt, DISPLAY_UTC_FORMAT)))
             .unwrap_or_else(|| "-".to_string());
 
         let overdue_cell = if p.ttr_overdue {
@@ -747,7 +755,7 @@ fn print_single_properties(p: &TicketSummaryProperties) {
         Cell::new("Date Created").add_attribute(Attribute::Bold),
         Cell::new(
             p.created_at
-                .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                .map(|d| format_utc(d, DISPLAY_UTC_FORMAT))
                 .unwrap_or_else(|| "-".to_string()),
         ),
     ]);
@@ -755,7 +763,7 @@ fn print_single_properties(p: &TicketSummaryProperties) {
         Cell::new("TTR Time (Due Date)").add_attribute(Attribute::Bold),
         Cell::new(
             p.ttr_time
-                .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                .map(|d| format_utc(d, DISPLAY_UTC_FORMAT))
                 .unwrap_or_else(|| "-".to_string()),
         ),
     ]);
@@ -819,7 +827,7 @@ fn print_single_ticket(t: &Ticket) {
         Cell::new("Date Created").add_attribute(Attribute::Bold),
         Cell::new(
             t.created_at
-                .map(|ca| ca.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                .map(|ca| format_utc(ca, DISPLAY_UTC_FORMAT))
                 .unwrap_or_else(|| "-".to_string()),
         ),
     ]);
@@ -827,7 +835,7 @@ fn print_single_ticket(t: &Ticket) {
         Cell::new("TTR Time (Due Date)").add_attribute(Attribute::Bold),
         Cell::new(
             t.ttr_time()
-                .map(|db| db.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                .map(|db| format_utc(db, DISPLAY_UTC_FORMAT))
                 .unwrap_or_else(|| "-".to_string()),
         ),
     ]);
@@ -895,7 +903,7 @@ fn print_single_ticket(t: &Ticket) {
                 .unwrap_or("Agent");
             let date_str = c
                 .created_at
-                .map(|d| d.format("%Y-%m-%d %H:%M:%S UTC").to_string())
+                .map(|d| format_utc(d, DISPLAY_UTC_FORMAT))
                 .unwrap_or_else(|| "-".to_string());
 
             println!(

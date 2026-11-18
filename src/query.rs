@@ -1,5 +1,6 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 /// Joins the `include` enum values into Freshdesk's comma-separated form.
 ///
@@ -124,7 +125,7 @@ pub struct ListTicketsQuery {
     pub requester_id: Option<u64>,
     pub email: Option<String>,
     pub company_id: Option<u64>,
-    pub updated_since: Option<DateTime<Utc>>,
+    pub updated_since: Option<OffsetDateTime>,
     pub order_by: Option<OrderBy>,
     pub order_type: Option<OrderType>,
     pub page: Option<u32>,
@@ -182,7 +183,11 @@ impl ListTicketsQuery {
             pairs.push(("company_id", cid.to_string()));
         }
         if let Some(dt) = &self.updated_since {
-            pairs.push(("updated_since", dt.to_rfc3339()));
+            pairs.push((
+                "updated_since",
+                dt.format(&Rfc3339)
+                    .expect("timestamp must be representable as RFC 3339"),
+            ));
         }
         if let Some(ob) = &self.order_by {
             pairs.push(("order_by", ob.as_str().to_string()));

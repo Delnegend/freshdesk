@@ -34,6 +34,26 @@ fn test_ticket_deserialization() {
 }
 
 #[test]
+fn ticket_timestamps_round_trip_and_filter() {
+    let ticket: Ticket = serde_json::from_value(serde_json::json!({
+        "id": 1, "subject": "test", "status": 2, "priority": 1,
+        "created_at": "2026-01-02T03:04:05+02:00",
+        "due_by": "2026-01-03T00:00:00Z"
+    }))
+    .unwrap();
+    let created = ticket.created_at.unwrap();
+    assert_eq!(created.unix_timestamp(), 1767315845);
+    let serialized = serde_json::to_value(&ticket).unwrap();
+    let restored: Ticket = serde_json::from_value(serialized).unwrap();
+    assert_eq!(restored.created_at, ticket.created_at);
+    let query = ListTicketsQuery {
+        updated_since: Some(created),
+        ..Default::default()
+    };
+    assert_eq!(query.to_query_pairs()[0].1, "2026-01-02T03:04:05+02:00");
+}
+
+#[test]
 fn test_ticket_status_and_priority_names() {
     let make_ticket = |status: i32, priority: i32, source: Option<i32>| Ticket {
         id: 1,

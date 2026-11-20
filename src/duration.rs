@@ -8,7 +8,7 @@
 //! not 24 hours, so tokens are summed by unit rather than rolled up.
 
 /// Seconds per supported unit suffix.
-fn unit_seconds(unit: char) -> Option<i64> {
+const fn unit_seconds(unit: char) -> Option<i64> {
     match unit {
         'w' => Some(604_800),
         'd' => Some(86_400),
@@ -23,52 +23,48 @@ fn unit_seconds(unit: char) -> Option<i64> {
 ///
 /// Returns `None` if the input is absent, empty, contains an unknown unit, or
 /// has trailing characters that are not part of a `<count><unit>` token.
+#[must_use]
 pub fn parse_duration(input: &str) -> Option<i64> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
         return None;
     }
 
-    let (sign, body) = match trimmed.as_bytes()[0] {
-        b'-' => (-1i64, &trimmed[1..]),
-        b'+' => (1i64, &trimmed[1..]),
-        _ => (1i64, trimmed),
-    };
-    if body.is_empty() {
-        return None;
-    }
-
-    let bytes = body.as_bytes();
+    let (sign, body) = trimmed.strip_prefix('-').map_or_else(
+        || (1i64, trimmed.strip_prefix('+').unwrap_or(trimmed)),
+        |body| (-1i64, body),
+    );
+    let mut chars = body.chars().peekable();
     let mut total: i64 = 0;
-    let mut idx = 0usize;
     let mut saw_token = false;
 
-    while idx < bytes.len() {
-        if bytes[idx] == b' ' {
-            idx += 1;
+    while let Some(&ch) = chars.peek() {
+        if ch == ' ' {
+            chars.next();
             continue;
         }
 
-        let count_start = idx;
-        while idx < bytes.len() && bytes[idx].is_ascii_digit() {
-            idx += 1;
+        let mut count = 0i64;
+        let mut saw_digit = false;
+        while let Some(&digit) = chars.peek() {
+            if !digit.is_ascii_digit() {
+                break;
+            }
+            count = count
+                .checked_mul(10)?
+                .checked_add(i64::from(digit.to_digit(10)?))?;
+            saw_digit = true;
+            chars.next();
         }
-        if idx == count_start {
-            // A digit was required here; anything else means malformed input.
+        if !saw_digit {
             return None;
         }
-        let count: i64 = body[count_start..idx].parse().ok()?;
 
-        if idx >= bytes.len() {
+        let unit = chars.next()?;
+        if !unit.is_ascii_alphabetic() {
             return None;
         }
-        let unit_char = body[idx..].chars().next()?;
-        if !unit_char.is_ascii_alphabetic() {
-            return None;
-        }
-        let multiplier = unit_seconds(unit_char.to_ascii_lowercase())?;
-        idx += unit_char.len_utf8();
-
+        let multiplier = unit_seconds(unit.to_ascii_lowercase())?;
         total = total.checked_add(count.checked_mul(multiplier)?)?;
         saw_token = true;
     }
@@ -76,7 +72,7 @@ pub fn parse_duration(input: &str) -> Option<i64> {
     if !saw_token {
         return None;
     }
-    Some(sign * total)
+    sign.checked_mul(total)
 }
 
 #[cfg(test)]

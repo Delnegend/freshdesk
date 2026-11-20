@@ -30,11 +30,11 @@ fn format_utc(dt: OffsetDateTime, fmt: &[FormatItem<'_>]) -> String {
 #[command(about = "Freshdesk CLI client for listing, querying, and searching tickets", long_about = None)]
 #[command(version)]
 struct Cli {
-    /// Freshdesk account domain or URL (required; set FD_SERVER in .env, or pass --server)
+    /// Freshdesk account domain or URL (required; set `FD_SERVER` in .env, or pass --server)
     #[arg(long, env = "FD_SERVER", global = true)]
     server: Option<String>,
 
-    /// Path to session file containing cookies (defaults to .freshdesk_session.json)
+    /// Path to session file containing cookies (defaults to `.freshdesk_session.json`)
     #[arg(long, global = true)]
     session_file: Option<String>,
 
@@ -72,7 +72,7 @@ enum Commands {
 
 #[derive(Args, Debug)]
 struct ListArgs {
-    /// Predefined filter (new_and_my_open, watching, spam, deleted)
+    /// Predefined filter (`new_and_my_open`, watching, spam, deleted)
     #[arg(long, value_enum)]
     filter: Option<FilterArg>,
 
@@ -104,6 +104,20 @@ struct ListArgs {
     #[arg(long, default_value = "30")]
     per_page: u32,
 
+    #[command(flatten)]
+    include: ListIncludes,
+
+    /// Output only key requested properties (TTR Time, TTR Overdue, _Components, Date Created)
+    #[arg(long)]
+    properties: bool,
+
+    /// Output raw JSON
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Args, Debug)]
+struct ListIncludes {
     /// Embed ticket description in response
     #[arg(long)]
     include_description: bool,
@@ -115,14 +129,6 @@ struct ListArgs {
     /// Embed ticket statistics in response
     #[arg(long)]
     include_stats: bool,
-
-    /// Output only key requested properties (TTR Time, TTR Overdue, _Components, Date Created)
-    #[arg(long)]
-    properties: bool,
-
-    /// Output raw JSON
-    #[arg(long)]
-    json: bool,
 }
 
 #[derive(Args, Debug)]
@@ -173,6 +179,20 @@ struct GetArgs {
     /// Ticket ID
     id: u64,
 
+    #[command(flatten)]
+    include: GetIncludes,
+
+    /// Output only key requested properties (TTR Time, TTR Overdue, _Components, Date Created)
+    #[arg(long)]
+    properties: bool,
+
+    /// Output raw JSON
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Args, Debug)]
+struct GetIncludes {
     /// Include conversations / notes
     #[arg(long, default_value = "true")]
     include_conversations: bool,
@@ -184,14 +204,6 @@ struct GetArgs {
     /// Include ticket stats
     #[arg(long)]
     include_stats: bool,
-
-    /// Output only key requested properties (TTR Time, TTR Overdue, _Components, Date Created)
-    #[arg(long)]
-    properties: bool,
-
-    /// Output raw JSON
-    #[arg(long)]
-    json: bool,
 }
 
 #[derive(Args, Debug)]
@@ -283,11 +295,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cli = Cli::parse();
 
-    if let Commands::Login = cli.command {
+    if matches!(cli.command, Commands::Login) {
         println!("Initiating automated Freshdesk agent login...");
         if !has_login_credentials() {
-            eprintln!("Error: FD_USER and FD_PASSWORD must be configured in .env or environment.");
-            std::process::exit(1);
+            return Err("FD_USER and FD_PASSWORD must be configured in .env or environment".into());
         }
         match run_login_helper().await {
             Ok(_) => {
@@ -295,8 +306,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Ok(());
             }
             Err(e) => {
-                eprintln!("Login failed: {}", e);
-                std::process::exit(1);
+                return Err(format!("Login failed: {e}").into());
             }
         }
     }
@@ -337,7 +347,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Me(args) => handle_me(&client, args).await?,
         Commands::Components(args) => handle_components(&client, args).await?,
         Commands::Report(args) => handle_report(&client, args).await?,
-        Commands::Login => unreachable!(),
+        Commands::Login => return Err("Login command was already handled".into()),
     }
 
     Ok(())
@@ -371,13 +381,13 @@ async fn handle_list(
     }
 
     let mut includes = Vec::new();
-    if args.include_description {
+    if args.include.include_description {
         includes.push(ListInclude::Description);
     }
-    if args.include_requester {
+    if args.include.include_requester {
         includes.push(ListInclude::Requester);
     }
-    if args.include_stats {
+    if args.include.include_stats {
         includes.push(ListInclude::Stats);
     }
     if !includes.is_empty() {
@@ -388,7 +398,7 @@ async fn handle_list(
 
     if args.properties {
         let props: Vec<TicketSummaryProperties> =
-            tickets.iter().map(|t| t.summary_properties()).collect();
+            tickets.iter().map(Ticket::summary_properties).collect();
         if args.json {
             println!("{}", serde_json::to_string_pretty(&props)?);
         } else {
@@ -430,17 +440,14 @@ async fn handle_search(
 
     let query = builder.build();
     if query.query.trim().is_empty() {
-        eprintln!(
-            "Error: Please provide a query string or at least one filter (--component, --created-after, etc.)"
-        );
-        std::process::exit(1);
+        return Err("Please provide a query string or at least one filter (--component, --created-after, etc.)".into());
     }
 
     if args.all {
         let all_tickets = client.search_all_tickets_paginated(&query, None).await?;
         if args.properties {
             let props: Vec<TicketSummaryProperties> =
-                all_tickets.iter().map(|t| t.summary_properties()).collect();
+                all_tickets.iter().map(Ticket::summary_properties).collect();
             if args.json {
                 println!("{}", serde_json::to_string_pretty(&props)?);
             } else {
@@ -459,7 +466,7 @@ async fn handle_search(
             let props: Vec<TicketSummaryProperties> = search_res
                 .results
                 .iter()
-                .map(|t| t.summary_properties())
+                .map(Ticket::summary_properties)
                 .collect();
             if args.json {
                 println!("{}", serde_json::to_string_pretty(&props)?);
@@ -482,13 +489,13 @@ async fn handle_get(
     args: GetArgs,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut includes = Vec::new();
-    if args.include_conversations {
+    if args.include.include_conversations {
         includes.push(GetTicketInclude::Conversations);
     }
-    if args.include_requester {
+    if args.include.include_requester {
         includes.push(GetTicketInclude::Requester);
     }
-    if args.include_stats {
+    if args.include.include_stats {
         includes.push(GetTicketInclude::Stats);
     }
 
@@ -566,7 +573,10 @@ async fn handle_components(
         ]);
 
         for (idx, name) in components.iter().enumerate() {
-            table.add_row(vec![Cell::new(idx + 1), Cell::new(name).fg(Color::Cyan)]);
+            table.add_row(vec![
+                Cell::new(idx.saturating_add(1)),
+                Cell::new(name).fg(Color::Cyan),
+            ]);
         }
 
         println!("{table}");
@@ -640,14 +650,14 @@ fn print_tickets_table(tickets: &[Ticket]) {
             _ => Color::White,
         };
 
-        let created_str = t
-            .created_at
-            .map(|dt| format_utc(dt, DISPLAY_MINUTE_FORMAT))
-            .unwrap_or_else(|| "-".to_string());
+        let created_str = t.created_at.map_or_else(
+            || "-".to_string(),
+            |dt| format_utc(dt, DISPLAY_MINUTE_FORMAT),
+        );
 
         let ttr_str = t
             .ttr_time_str()
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
             .or_else(|| t.ttr_time().map(|dt| format_utc(dt, DISPLAY_MINUTE_FORMAT)))
             .unwrap_or_else(|| "-".to_string());
 
@@ -702,8 +712,7 @@ fn print_properties_table(props: &[TicketSummaryProperties]) {
     for p in props {
         let created_str = p
             .created_at
-            .map(|dt| format_utc(dt, DISPLAY_UTC_FORMAT))
-            .unwrap_or_else(|| "-".to_string());
+            .map_or_else(|| "-".to_string(), |dt| format_utc(dt, DISPLAY_UTC_FORMAT));
 
         let ttr_str = p
             .ttr_time_str
@@ -755,16 +764,14 @@ fn print_single_properties(p: &TicketSummaryProperties) {
         Cell::new("Date Created").add_attribute(Attribute::Bold),
         Cell::new(
             p.created_at
-                .map(|d| format_utc(d, DISPLAY_UTC_FORMAT))
-                .unwrap_or_else(|| "-".to_string()),
+                .map_or_else(|| "-".to_string(), |d| format_utc(d, DISPLAY_UTC_FORMAT)),
         ),
     ]);
     table.add_row(vec![
         Cell::new("TTR Time (Due Date)").add_attribute(Attribute::Bold),
         Cell::new(
             p.ttr_time
-                .map(|d| format_utc(d, DISPLAY_UTC_FORMAT))
-                .unwrap_or_else(|| "-".to_string()),
+                .map_or_else(|| "-".to_string(), |d| format_utc(d, DISPLAY_UTC_FORMAT)),
         ),
     ]);
     if let Some(s) = &p.ttr_time_str {
@@ -827,16 +834,14 @@ fn print_single_ticket(t: &Ticket) {
         Cell::new("Date Created").add_attribute(Attribute::Bold),
         Cell::new(
             t.created_at
-                .map(|ca| format_utc(ca, DISPLAY_UTC_FORMAT))
-                .unwrap_or_else(|| "-".to_string()),
+                .map_or_else(|| "-".to_string(), |ca| format_utc(ca, DISPLAY_UTC_FORMAT)),
         ),
     ]);
     table.add_row(vec![
         Cell::new("TTR Time (Due Date)").add_attribute(Attribute::Bold),
         Cell::new(
             t.ttr_time()
-                .map(|db| format_utc(db, DISPLAY_UTC_FORMAT))
-                .unwrap_or_else(|| "-".to_string()),
+                .map_or_else(|| "-".to_string(), |db| format_utc(db, DISPLAY_UTC_FORMAT)),
         ),
     ]);
     if let Some(ttr_s) = t.ttr_time_str() {
@@ -883,7 +888,10 @@ fn print_single_ticket(t: &Ticket) {
     }
 
     println!("{table}");
+    print_conversations(t);
+}
 
+fn print_conversations(t: &Ticket) {
     if let Some(convs) = &t.conversations
         && !convs.is_empty()
     {
@@ -903,12 +911,11 @@ fn print_single_ticket(t: &Ticket) {
                 .unwrap_or("Agent");
             let date_str = c
                 .created_at
-                .map(|d| format_utc(d, DISPLAY_UTC_FORMAT))
-                .unwrap_or_else(|| "-".to_string());
+                .map_or_else(|| "-".to_string(), |d| format_utc(d, DISPLAY_UTC_FORMAT));
 
             println!(
                 "\n[#{}] {} from {} at {}",
-                idx + 1,
+                idx.saturating_add(1),
                 note_type,
                 from_str,
                 date_str

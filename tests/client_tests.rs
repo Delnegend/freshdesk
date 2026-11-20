@@ -42,7 +42,7 @@ fn ticket_timestamps_round_trip_and_filter() {
     }))
     .unwrap();
     let created = ticket.created_at.unwrap();
-    assert_eq!(created.unix_timestamp(), 1767315845);
+    assert_eq!(created.unix_timestamp(), 1_767_315_845);
     let serialized = serde_json::to_value(&ticket).unwrap();
     let restored: Ticket = serde_json::from_value(serialized).unwrap();
     assert_eq!(restored.created_at, ticket.created_at);
@@ -50,7 +50,19 @@ fn ticket_timestamps_round_trip_and_filter() {
         updated_since: Some(created),
         ..Default::default()
     };
-    assert_eq!(query.to_query_pairs()[0].1, "2026-01-02T03:04:05+02:00");
+    assert_eq!(
+        query.to_query_pairs().unwrap()[0].1,
+        "2026-01-02T03:04:05+02:00"
+    );
+}
+
+#[test]
+fn list_query_rejects_non_rfc3339_timestamp() {
+    let query = ListTicketsQuery {
+        updated_since: Some(time::macros::datetime!(-0001-01-01 00:00 UTC)),
+        ..Default::default()
+    };
+    assert!(query.to_query_pairs().is_err());
 }
 
 #[test]
@@ -117,19 +129,19 @@ fn test_list_tickets_query_builder() {
         .order_type(OrderType::Desc)
         .include(&[ListInclude::Description, ListInclude::Requester]);
 
-    let pairs = query.to_query_pairs();
+    let pairs = query.to_query_pairs().unwrap();
     let map: std::collections::HashMap<_, _> = pairs.into_iter().collect();
 
     assert_eq!(
-        map.get("filter").map(|s| s.as_str()),
+        map.get("filter").map(String::as_str),
         Some("new_and_my_open")
     );
-    assert_eq!(map.get("page").map(|s| s.as_str()), Some("2"));
-    assert_eq!(map.get("per_page").map(|s| s.as_str()), Some("50"));
-    assert_eq!(map.get("order_by").map(|s| s.as_str()), Some("created_at"));
-    assert_eq!(map.get("order_type").map(|s| s.as_str()), Some("desc"));
+    assert_eq!(map.get("page").map(String::as_str), Some("2"));
+    assert_eq!(map.get("per_page").map(String::as_str), Some("50"));
+    assert_eq!(map.get("order_by").map(String::as_str), Some("created_at"));
+    assert_eq!(map.get("order_type").map(String::as_str), Some("desc"));
     assert_eq!(
-        map.get("include").map(|s| s.as_str()),
+        map.get("include").map(String::as_str),
         Some("description,requester")
     );
 }
@@ -141,10 +153,10 @@ fn test_search_tickets_query() {
     let map: std::collections::HashMap<_, _> = pairs.into_iter().collect();
 
     assert_eq!(
-        map.get("query").map(|s| s.as_str()),
+        map.get("query").map(String::as_str),
         Some("\"status:2 AND priority:1\"")
     );
-    assert_eq!(map.get("page").map(|s| s.as_str()), Some("3"));
+    assert_eq!(map.get("page").map(String::as_str), Some("3"));
 }
 
 #[test]
@@ -173,7 +185,7 @@ fn test_get_ticket_query() {
     let map: std::collections::HashMap<_, _> = pairs.into_iter().collect();
 
     assert_eq!(
-        map.get("include").map(|s| s.as_str()),
+        map.get("include").map(String::as_str),
         Some("conversations,stats")
     );
 }
@@ -355,7 +367,7 @@ fn test_excel_checkbox_and_formula_writer() {
         .unwrap();
 
     let buf = workbook.save_to_buffer().unwrap();
-    assert!(!buf.is_empty());
+    assert_ne!(buf, Vec::<u8>::new());
 }
 
 #[test]
@@ -363,18 +375,26 @@ fn test_quarter_parsing_and_date_bounds() {
     let q1 = Quarter::parse("2026Q1").unwrap();
     assert_eq!(q1.year, 2026);
     assert_eq!(q1.quarter, 1);
-    let (_, _, s1, e1) = q1.search_date_bounds();
+    let (_, _, s1, e1) = q1.search_date_bounds().unwrap();
     assert_eq!(s1, "2025-12-31");
     assert_eq!(e1, "2026-04-01");
 
     let q3 = Quarter::parse("2026-Q3").unwrap();
     assert_eq!(q3.year, 2026);
     assert_eq!(q3.quarter, 3);
-    let (_, _, s3, e3) = q3.search_date_bounds();
+    let (_, _, s3, e3) = q3.search_date_bounds().unwrap();
     assert_eq!(s3, "2026-06-30");
     assert_eq!(e3, "2026-10-01");
     assert_eq!(q3.to_string_code(), "2026Q3");
 
     assert!(Quarter::parse("invalid").is_err());
     assert!(Quarter::parse("2026Q5").is_err());
+    assert!(
+        Quarter {
+            year: 2026,
+            quarter: 0
+        }
+        .search_date_bounds()
+        .is_err()
+    );
 }

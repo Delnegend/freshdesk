@@ -32,6 +32,9 @@ impl AuthMethod {
     /// 2. `FD_SESSION_COOKIE` environment variable.
     /// 3. Existing session file (`.freshdesk_session.json` in cwd or `~/.freshdesk_session.json`).
     /// 4. Auto-login via `scripts/login.ts` if credentials exist in `.env` or environment.
+    ///
+    /// # Errors
+    /// Returns an error if no authentication is available or automated login fails.
     pub async fn auto_resolve() -> Result<Self> {
         if let Ok(api_key) = std::env::var("FD_API_KEY") {
             let trimmed = api_key.trim();
@@ -69,6 +72,7 @@ impl AuthMethod {
 }
 
 /// Look for `.freshdesk_session.json` in current dir or home dir.
+#[must_use]
 pub fn find_session_file() -> Option<PathBuf> {
     let cwd_path = PathBuf::from(".freshdesk_session.json");
     if cwd_path.is_file() {
@@ -86,16 +90,19 @@ pub fn find_session_file() -> Option<PathBuf> {
 }
 
 /// Read the cookie header from a session JSON file.
+///
+/// # Errors
+/// Returns an error if the file cannot be read, parsed, or has an empty cookie header.
 pub fn read_session_file(path: &Path) -> Result<String> {
     let content = std::fs::read_to_string(path).map_err(|e| FreshdeskError::SessionFile {
         path: path.to_path_buf(),
-        message: format!("Failed to read session file: {}", e),
+        message: format!("Failed to read session file: {e}"),
     })?;
 
     let session: SessionFile =
         serde_json::from_str(&content).map_err(|e| FreshdeskError::SessionFile {
             path: path.to_path_buf(),
-            message: format!("Failed to parse session JSON: {}", e),
+            message: format!("Failed to parse session JSON: {e}"),
         })?;
 
     if session.cookie_header.trim().is_empty() {
@@ -109,17 +116,17 @@ pub fn read_session_file(path: &Path) -> Result<String> {
 }
 
 /// Check if username and password credentials are available in environment.
+#[must_use]
 pub fn has_login_credentials() -> bool {
-    let has_user = std::env::var("FD_USER")
-        .map(|u| !u.trim().is_empty())
-        .unwrap_or(false);
-    let has_pass = std::env::var("FD_PASSWORD")
-        .map(|p| !p.trim().is_empty())
-        .unwrap_or(false);
+    let has_user = std::env::var("FD_USER").is_ok_and(|u| !u.trim().is_empty());
+    let has_pass = std::env::var("FD_PASSWORD").is_ok_and(|p| !p.trim().is_empty());
     has_user && has_pass
 }
 
 /// Execute `scripts/login.ts` via Bun (with xvfb if on Linux) to obtain fresh session cookies.
+///
+/// # Errors
+/// Returns an error if the script is missing, fails to run, or does not produce a valid session file.
 pub async fn run_login_helper() -> Result<String> {
     let script_path = PathBuf::from("scripts/login.ts");
     if !script_path.is_file() {
@@ -132,7 +139,7 @@ pub async fn run_login_helper() -> Result<String> {
     info!("Running automated login script at {:?}", script_path);
 
     // Determine if xvfb-run should be used
-    let mut cmd = if cfg!(target_os = "linux") && which_exists("xvfb-run") {
+    let cmd = if cfg!(target_os = "linux") && which_exists("xvfb-run") {
         let mut c = Command::new("xvfb-run");
         c.arg("-a").arg("bun").arg("run").arg(&script_path);
         c
@@ -142,9 +149,10 @@ pub async fn run_login_helper() -> Result<String> {
         c
     };
 
-    let output = cmd.output().map_err(|e| {
-        FreshdeskError::LoginHelper(format!("Failed to execute login script: {}", e))
-    })?;
+    let output = tokio::process::Command::from(cmd)
+        .output()
+        .await
+        .map_err(|e| FreshdeskError::LoginHelper(format!("Failed to execute login script: {e}")))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -172,6 +180,5 @@ fn which_exists(bin: &str) -> bool {
     Command::new("which")
         .arg(bin)
         .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|o| o.status.success())
 }

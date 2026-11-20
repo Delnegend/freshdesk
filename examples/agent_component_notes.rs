@@ -67,9 +67,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             other => return Err(format!("unknown argument: {other}").into()),
         }
     }
-    let (component, from, to) = match (component, from, to) {
-        (Some(c), Some(f), Some(t)) => (c, f, t),
-        _ => return Err("--component, --from and --to are all required".into()),
+    let (Some(component), Some(from), Some(to)) = (component, from, to) else {
+        return Err("--component, --from and --to are all required".into());
     };
     if to < from {
         return Err("--to must not be before --from".into());
@@ -108,18 +107,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 2. Walk each full thread (paginated), keeping the agent's entries.
     let mut hits: Vec<HitTicket> = Vec::new();
-    for (n, t) in tickets.iter().enumerate() {
+    for (n, t) in (1..).zip(&tickets) {
         let mut entries = Vec::new();
         for c in client.ticket_conversations(t.id, None).await? {
             if c.user_id == Some(agent_id) {
                 entries.push(AgentEntry {
                     at: c
                         .created_at
-                        .map(|d| format_utc(d, ENTRY_FORMAT))
-                        .unwrap_or_else(|| "-".to_string()),
+                        .map_or_else(|| "-".to_string(), |d| format_utc(d, ENTRY_FORMAT)),
                     private: c.private.unwrap_or(false),
                     incoming: c.incoming.unwrap_or(false),
-                    text: c.body_text.clone().unwrap_or_default(),
+                    text: c.body_text.unwrap_or_default(),
                 });
             }
         }
@@ -129,14 +127,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 subject: t.subject.clone(),
                 created: t
                     .created_at
-                    .map(|d| format_utc(d, DATE_FORMAT))
-                    .unwrap_or_else(|| "-".to_string()),
+                    .map_or_else(|| "-".to_string(), |d| format_utc(d, DATE_FORMAT)),
                 status: t.status_name().to_string(),
                 entries,
             });
         }
-        if (n + 1) % 25 == 0 {
-            println!("  scanned {}/{}", n + 1, tickets.len());
+        if n % 25 == 0 {
+            println!("  scanned {}/{}", n, tickets.len());
         }
         tokio::time::sleep(Duration::from_millis(700)).await;
     }
@@ -149,14 +146,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         entry_total
     );
 
-    // 3. Markdown report: stdout summary + optional file.
-    let markdown = render_markdown(&component, from, to, agent_id, &hits);
+    write_report(&component, from, to, agent_id, &hits, output)?;
+    Ok(())
+}
+
+fn write_report(
+    component: &str,
+    from: Date,
+    to: Date,
+    agent_id: u64,
+    hits: &[HitTicket],
+    output: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let markdown = render_markdown(component, from, to, agent_id, hits);
     if let Some(path) = output {
         std::fs::write(&path, &markdown)?;
         println!("Wrote {path}");
     } else {
         println!();
-        for h in &hits {
+        for h in hits {
             println!("  {} ({}): {}", h.id, h.entries.len(), h.subject);
         }
         println!(

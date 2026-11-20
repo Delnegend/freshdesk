@@ -20,12 +20,15 @@ pub struct FreshdeskClient {
 }
 
 impl FreshdeskClient {
-    /// Creates a new FreshdeskClient with a server host/URL and authentication method.
+    /// Creates a new `FreshdeskClient` with a server host/URL and authentication method.
     ///
     /// If `server` does not contain a scheme, `https://` is prepended.
     /// If `server` is a custom portal domain rather than a canonical
     /// `*.freshdesk.com` host, use `builder().auto_resolve_domain(true)` to map
     /// it to the canonical domain.
+    ///
+    /// # Errors
+    /// Returns an error if the URL or authentication headers are invalid, or the HTTP client cannot be built.
     pub fn new(server: impl AsRef<str>, auth: AuthMethod) -> Result<Self> {
         let server_str = server.as_ref().trim();
         let base_url = normalize_server_url(server_str)?;
@@ -37,18 +40,17 @@ impl FreshdeskClient {
             AuthMethod::ApiKey(key) => {
                 use base64::Engine;
                 use base64::engine::general_purpose::STANDARD as BASE64;
-                let creds = format!("{}:X", key);
+                let creds = format!("{key}:X");
                 let encoded = BASE64.encode(creds.as_bytes());
-                let mut val =
-                    HeaderValue::from_str(&format!("Basic {}", encoded)).map_err(|e| {
-                        FreshdeskError::Configuration(format!("Invalid API key header: {}", e))
-                    })?;
+                let mut val = HeaderValue::from_str(&format!("Basic {encoded}")).map_err(|e| {
+                    FreshdeskError::Configuration(format!("Invalid API key header: {e}"))
+                })?;
                 val.set_sensitive(true);
                 headers.insert(AUTHORIZATION, val);
             }
             AuthMethod::SessionCookie(cookie) => {
                 let mut val = HeaderValue::from_str(cookie).map_err(|e| {
-                    FreshdeskError::Configuration(format!("Invalid Cookie header: {}", e))
+                    FreshdeskError::Configuration(format!("Invalid Cookie header: {e}"))
                 })?;
                 val.set_sensitive(true);
                 headers.insert(COOKIE, val);
@@ -67,17 +69,21 @@ impl FreshdeskClient {
         })
     }
 
-    /// Builder for FreshdeskClient.
+    /// Builder for `FreshdeskClient`.
+    #[must_use]
     pub fn builder() -> FreshdeskClientBuilder {
         FreshdeskClientBuilder::default()
     }
 
-    /// Creates a FreshdeskClient from the environment and any cached session.
+    /// Creates a `FreshdeskClient` from the environment and any cached session.
     ///
     /// Requires `FD_SERVER` to name the Freshdesk account to target, either as a
     /// canonical `*.freshdesk.com` host or a custom portal domain. There is no
     /// built-in default: the account is deployment-specific and must be set
     /// explicitly (typically in `.env`).
+    ///
+    /// # Errors
+    /// Returns an error if configuration, authentication, domain resolution, or client creation fails.
     pub async fn from_env() -> Result<Self> {
         let _ = dotenvy::dotenv();
 
@@ -102,21 +108,28 @@ impl FreshdeskClient {
     }
 
     /// Base URL for the client.
-    pub fn base_url(&self) -> &Url {
+    #[must_use]
+    pub const fn base_url(&self) -> &Url {
         &self.base_url
     }
 
     /// The authentication method in use.
-    pub fn auth(&self) -> &AuthMethod {
+    #[must_use]
+    pub const fn auth(&self) -> &AuthMethod {
         &self.auth
     }
 
     /// List tickets with optional filters, pagination, and embedded associations.
     ///
     /// Corresponds to `GET /api/v2/tickets`.
+    ///
+    /// # Errors
+    /// Returns an error if the timestamp cannot be formatted, the request fails, or the response cannot be decoded.
     pub async fn list_tickets(&self, query: &ListTicketsQuery) -> Result<Vec<Ticket>> {
         let path = "api/v2/tickets";
-        let query_pairs = query.to_query_pairs();
+        let query_pairs = query.to_query_pairs().map_err(|error| {
+            FreshdeskError::Configuration(format!("Invalid updated_since timestamp: {error}"))
+        })?;
         self.get_json(path, &query_pairs).await
     }
 
@@ -124,6 +137,9 @@ impl FreshdeskClient {
     ///
     /// Example query: `"status:2 AND priority:1"` or `"type:'VVIP'"`
     /// Corresponds to `GET /api/v2/search/tickets?query="..."`.
+    ///
+    /// # Errors
+    /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn search_tickets(&self, query: &SearchTicketsQuery) -> Result<SearchResult<Ticket>> {
         let path = "api/v2/search/tickets";
         let query_pairs = query.to_query_pairs();
@@ -133,9 +149,12 @@ impl FreshdeskClient {
     /// Get details of a single ticket by its ID.
     ///
     /// Corresponds to `GET /api/v2/tickets/{id}`.
+    ///
+    /// # Errors
+    /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn get_ticket(&self, id: u64, query: Option<&GetTicketQuery>) -> Result<Ticket> {
-        let path = format!("api/v2/tickets/{}", id);
-        let query_pairs = query.map(|q| q.to_query_pairs()).unwrap_or_default();
+        let path = format!("api/v2/tickets/{id}");
+        let query_pairs = query.map_or_else(Vec::new, GetTicketQuery::to_query_pairs);
         self.get_json(&path, &query_pairs).await
     }
 
@@ -143,12 +162,15 @@ impl FreshdeskClient {
     ///
     /// Corresponds to `GET /api/v2/tickets/{id}/conversations`. Pages hold up
     /// to 30 entries; prefer [`Self::ticket_conversations`] for the full thread.
+    ///
+    /// # Errors
+    /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn list_ticket_conversations(
         &self,
         ticket_id: u64,
         page: u32,
     ) -> Result<Vec<Conversation>> {
-        let path = format!("api/v2/tickets/{}/conversations", ticket_id);
+        let path = format!("api/v2/tickets/{ticket_id}/conversations");
         let page_str = page.to_string();
         self.get_json(&path, &[("page", page_str)]).await
     }
@@ -157,6 +179,9 @@ impl FreshdeskClient {
     ///
     /// Needed because `include=conversations` on [`Self::get_ticket`] truncates
     /// long threads; this endpoint returns the complete history page by page.
+    ///
+    /// # Errors
+    /// Returns an error if any page request fails or its response cannot be decoded.
     pub async fn ticket_conversations(
         &self,
         ticket_id: u64,
@@ -180,12 +205,18 @@ impl FreshdeskClient {
     /// Get current authenticated agent information.
     ///
     /// Corresponds to `GET /api/v2/agents/me`.
+    ///
+    /// # Errors
+    /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn current_agent(&self) -> Result<Agent> {
         let path = "api/v2/agents/me";
         self.get_json(path, &[]).await
     }
 
     /// List all tickets across multiple pages up to `max_pages`.
+    ///
+    /// # Errors
+    /// Returns an error if any page request fails or its response cannot be decoded.
     pub async fn list_all_tickets_paginated(
         &self,
         query: &ListTicketsQuery,
@@ -193,7 +224,7 @@ impl FreshdeskClient {
     ) -> Result<Vec<Ticket>> {
         let mut all_tickets = Vec::new();
         let start_page = query.page.unwrap_or(1);
-        let limit = max_pages.unwrap_or(10) as usize;
+        let limit = usize::try_from(max_pages.unwrap_or(10)).unwrap_or(usize::MAX);
 
         for current_page in (start_page..).take(limit) {
             let mut page_query = query.clone();
@@ -211,6 +242,9 @@ impl FreshdeskClient {
     }
 
     /// Search all tickets across multiple pages up to `max_pages` (Freshdesk search supports up to 10 pages).
+    ///
+    /// # Errors
+    /// Returns an error if any page request fails or its response cannot be decoded.
     pub async fn search_all_tickets_paginated(
         &self,
         query: &SearchTicketsQuery,
@@ -218,7 +252,7 @@ impl FreshdeskClient {
     ) -> Result<Vec<Ticket>> {
         let mut all_tickets = Vec::new();
         let start_page = query.page.unwrap_or(1);
-        let limit = max_pages.unwrap_or(10).min(10) as usize;
+        let limit = usize::try_from(max_pages.unwrap_or(10).min(10)).unwrap_or(usize::MAX);
 
         for current_page in (start_page..).take(limit) {
             let mut page_query = query.clone();
@@ -240,13 +274,19 @@ impl FreshdeskClient {
         Ok(all_tickets)
     }
 
-    /// Retrieve all ticket fields definitions from GET /api/v2/ticket_fields.
+    /// Retrieve all ticket fields definitions from `GET /api/v2/ticket_fields`.
+    ///
+    /// # Errors
+    /// Returns an error if the request fails or the response cannot be decoded.
     pub async fn get_ticket_fields(&self) -> Result<Vec<TicketField>> {
         let path = "api/v2/ticket_fields";
         self.get_json(path, &[]).await
     }
 
     /// Retrieve the upstream list of all product choices configured for `_Components` (`cf__components`).
+    ///
+    /// # Errors
+    /// Returns an error if fetching or decoding the ticket fields fails.
     pub async fn get_components_choices(&self) -> Result<Vec<String>> {
         let fields = self.get_ticket_fields().await?;
         if let Some(f) = fields.iter().find(|f| f.name == "cf__components") {
@@ -280,9 +320,9 @@ impl FreshdeskClient {
             }
         }
         debug!("GET {}", url);
-        let mut attempts = 0;
+        let mut attempts: u32 = 0;
         loop {
-            attempts += 1;
+            attempts = attempts.saturating_add(1);
             let response = self.http.get(url.clone()).send().await?;
             if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS && attempts <= 3 {
                 let retry_after = response
@@ -296,7 +336,10 @@ impl FreshdeskClient {
                         "Rate limited by Freshdesk API (status 429); sleeping {}s before retry...",
                         retry_after
                     );
-                    tokio::time::sleep(std::time::Duration::from_secs(retry_after + 1)).await;
+                    tokio::time::sleep(std::time::Duration::from_secs(
+                        retry_after.saturating_add(1),
+                    ))
+                    .await;
                     continue;
                 }
             }
@@ -305,7 +348,7 @@ impl FreshdeskClient {
     }
 }
 
-/// Builder for FreshdeskClient.
+/// Builder for `FreshdeskClient`.
 #[derive(Debug, Default)]
 pub struct FreshdeskClientBuilder {
     server: Option<String>,
@@ -314,21 +357,28 @@ pub struct FreshdeskClientBuilder {
 }
 
 impl FreshdeskClientBuilder {
+    #[must_use]
     pub fn server(mut self, server: impl Into<String>) -> Self {
         self.server = Some(server.into());
         self
     }
 
+    #[must_use]
     pub fn auth(mut self, auth: AuthMethod) -> Self {
         self.auth = Some(auth);
         self
     }
 
-    pub fn auto_resolve_domain(mut self, enable: bool) -> Self {
+    #[must_use]
+    pub const fn auto_resolve_domain(mut self, enable: bool) -> Self {
         self.auto_resolve_domain = enable;
         self
     }
 
+    /// Builds a client with the configured server and authentication.
+    ///
+    /// # Errors
+    /// Returns an error if configuration, authentication, domain resolution, or client creation fails.
     pub async fn build(self) -> Result<FreshdeskClient> {
         let server = self.server.ok_or_else(|| {
             FreshdeskError::Configuration("Server domain or URL is required".to_string())
@@ -351,7 +401,7 @@ impl FreshdeskClientBuilder {
 
 fn normalize_server_url(server: &str) -> Result<Url> {
     let url_str = if !server.starts_with("http://") && !server.starts_with("https://") {
-        format!("https://{}", server)
+        format!("https://{server}")
     } else {
         server.to_string()
     };
@@ -367,6 +417,9 @@ fn normalize_server_url(server: &str) -> Result<Url> {
 
 /// Discovers the canonical `*.freshdesk.com` domain for a custom portal CNAME by
 /// following the login redirect and reading its `hd` parameter.
+///
+/// # Errors
+/// Returns an error if the HTTP client cannot be built or the request fails.
 pub async fn resolve_canonical_freshdesk_domain(server: &str) -> Result<String> {
     let host = server
         .trim()
@@ -383,7 +436,7 @@ pub async fn resolve_canonical_freshdesk_domain(server: &str) -> Result<String> 
         "Resolving canonical Freshdesk domain for custom host: {}",
         host
     );
-    let check_url = format!("https://{}/en/support/login", host);
+    let check_url = format!("https://{host}/en/support/login");
 
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
@@ -436,7 +489,7 @@ async fn handle_response<T: DeserializeOwned>(response: Response) -> Result<T> {
         let code = err_json
             .get("code")
             .and_then(|c| c.as_str())
-            .map(|s| s.to_string());
+            .map(ToString::to_string);
         let message = err_json
             .get("message")
             .and_then(|m| m.as_str())

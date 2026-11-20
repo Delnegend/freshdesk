@@ -102,7 +102,8 @@ pub struct Ticket {
 
 impl Ticket {
     /// Human-readable ticket status.
-    pub fn status_name(&self) -> &'static str {
+    #[must_use]
+    pub const fn status_name(&self) -> &'static str {
         match self.status {
             2 => "Open",
             3 => "Pending",
@@ -115,7 +116,8 @@ impl Ticket {
     }
 
     /// Human-readable ticket priority.
-    pub fn priority_name(&self) -> &'static str {
+    #[must_use]
+    pub const fn priority_name(&self) -> &'static str {
         match self.priority {
             1 => "Low",
             2 => "Medium",
@@ -126,7 +128,8 @@ impl Ticket {
     }
 
     /// Human-readable ticket source.
-    pub fn source_name(&self) -> &'static str {
+    #[must_use]
+    pub const fn source_name(&self) -> &'static str {
         match self.source {
             Some(1) => "Email",
             Some(2) => "Portal",
@@ -143,17 +146,20 @@ impl Ticket {
     }
 
     /// Date of creation of the ticket (`created_at`).
-    pub fn created_at(&self) -> Option<OffsetDateTime> {
+    #[must_use]
+    pub const fn created_at(&self) -> Option<OffsetDateTime> {
         self.created_at
     }
 
     /// TTR Time (Resolution Due Date).
     /// Corresponds to the target resolution deadline (`due_by`).
-    pub fn ttr_time(&self) -> Option<OffsetDateTime> {
+    #[must_use]
+    pub const fn ttr_time(&self) -> Option<OffsetDateTime> {
         self.due_by
     }
 
     /// TTR remaining/elapsed time duration string from `cf_ttr_time` (e.g. "6d 23h 44m 36s" or "-2d 10h 57m").
+    #[must_use]
     pub fn ttr_time_str(&self) -> Option<&str> {
         self.custom_field_str("cf_ttr_time")
     }
@@ -177,6 +183,7 @@ impl Ticket {
     /// never treated as L3-violated. This is derived from the raw time fields
     /// rather than read from the upstream `cf__l3_violated` automation field,
     /// so it stays correct even if that automation goes stale.
+    #[must_use]
     pub fn l3_time_violated(&self) -> bool {
         match (self.l3_time_actual(), self.l3_time_allowed()) {
             (Some(actual), Some(allowed)) => actual > allowed,
@@ -188,6 +195,7 @@ impl Ticket {
     /// escalation SLA (`_L3 Time Actual` > `_L3 Time Allowed`).
     ///
     /// A ticket must satisfy both criteria to be reported as overdue.
+    #[must_use]
     pub fn ttr_overdue(&self) -> bool {
         self.ttr_overdue_base() && self.l3_time_violated()
     }
@@ -216,6 +224,7 @@ impl Ticket {
 
     /// Components (list of products): extracts the component(s) assigned to this ticket.
     /// Inspects `cf__components` and fallbacks to `cf_component`.
+    #[must_use]
     pub fn components(&self) -> Vec<String> {
         if let Some(cf) = &self.custom_fields {
             if let Some(val) = cf.get("cf__components") {
@@ -248,11 +257,13 @@ impl Ticket {
     }
 
     /// Primary component for this ticket, if any.
+    #[must_use]
     pub fn primary_component(&self) -> Option<String> {
         self.components().into_iter().next()
     }
 
     /// Retrieve a custom field value as a string slice by key.
+    #[must_use]
     pub fn custom_field_str(&self, key: &str) -> Option<&str> {
         self.custom_fields.as_ref()?.get(key)?.as_str()
     }
@@ -262,13 +273,14 @@ impl Ticket {
     /// - TTR Overdue (boolean)
     /// - _Components (list of products)
     /// - Date creation (datetime)
+    #[must_use]
     pub fn summary_properties(&self) -> TicketSummaryProperties {
         TicketSummaryProperties {
             id: self.id,
             subject: self.subject.clone(),
             created_at: self.created_at,
             ttr_time: self.ttr_time(),
-            ttr_time_str: self.ttr_time_str().map(|s| s.to_string()),
+            ttr_time_str: self.ttr_time_str().map(str::to_string),
             ttr_overdue: self.ttr_overdue(),
             components: self.components(),
         }
@@ -451,7 +463,7 @@ pub struct AgentContact {
     pub time_zone: Option<String>,
 }
 
-/// Field definition from GET /api/v2/ticket_fields.
+/// Field definition from `GET /api/v2/ticket_fields`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TicketField {
     pub id: u64,
@@ -471,6 +483,7 @@ pub struct TicketField {
 impl TicketField {
     /// Extracts choices as a list of strings regardless of whether choices
     /// is an array (e.g. `["choice1", "choice2"]`) or an object map.
+    #[must_use]
     pub fn choices_list(&self) -> Vec<String> {
         let mut list = Vec::new();
         if let Some(choices) = &self.choices {

@@ -6,7 +6,7 @@ async fn test_live_freshdesk_client() {
     let client = match FreshdeskClient::from_env().await {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Skipping live test: {}", e);
+            eprintln!("Skipping live test: {e}");
             return;
         }
     };
@@ -26,7 +26,7 @@ async fn test_live_freshdesk_client() {
     let first = &tickets[0];
     println!("First ticket: #{} - {}", first.id, first.subject);
     assert!(first.id > 0);
-    assert!(!first.subject.is_empty());
+    assert_ne!(first.subject, "");
 
     // 2. Test search tickets
     let search_query = SearchTicketsQuery::new("status:7");

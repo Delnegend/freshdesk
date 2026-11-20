@@ -15,7 +15,7 @@ async fn test_upstream_components_schema_changes() {
     let client = match FreshdeskClient::from_env().await {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Skipping component test: {}", e);
+            eprintln!("Skipping component test: {e}");
             return;
         }
     };
@@ -34,10 +34,7 @@ async fn test_upstream_components_schema_changes() {
     }
 
     let Some(baseline) = freshdesk::report::product_set_from_env(BASELINE_ENV) else {
-        eprintln!(
-            "Skipping component catalog test: {} is not set",
-            BASELINE_ENV
-        );
+        eprintln!("Skipping component catalog test: {BASELINE_ENV} is not set");
         return;
     };
     let baseline_len = baseline.len();
@@ -52,15 +49,13 @@ async fn test_upstream_components_schema_changes() {
     added.sort();
     removed.sort();
 
-    if !added.is_empty() || !removed.is_empty() {
-        panic!(
-            "\nUpstream _Components choices have changed!\n\
-             Added components:   {:?}\n\
-             Removed components: {:?}\n\
-             Update {} in .env to match.",
-            added, removed, BASELINE_ENV
-        );
-    }
+    assert!(
+        added.is_empty() && removed.is_empty(),
+        "\nUpstream _Components choices have changed!\n\
+         Added components:   {added:?}\n\
+         Removed components: {removed:?}\n\
+         Update {BASELINE_ENV} in .env to match."
+    );
 
     assert_eq!(upstream_set.len(), baseline_len, "Component count mismatch");
     println!("\nUpstream _Components matches baseline: {baseline_len} components.");
@@ -71,7 +66,7 @@ async fn test_ticket_extracted_properties() {
     let client = match FreshdeskClient::from_env().await {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Skipping ticket properties test: {}", e);
+            eprintln!("Skipping ticket properties test: {e}");
             return;
         }
     };
@@ -146,7 +141,7 @@ async fn test_l3_violated_field_matches_computed_comparison() {
     let client = match FreshdeskClient::from_env().await {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Skipping L3 equivalence test: {}", e);
+            eprintln!("Skipping L3 equivalence test: {e}");
             return;
         }
     };

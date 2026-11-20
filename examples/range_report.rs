@@ -15,7 +15,7 @@ use time::macros::format_description;
 use time::{Date, Duration as TimeDelta};
 
 const DATE_FORMAT: &[FormatItem<'_>] = format_description!("[year]-[month]-[day]");
-use rust_xlsxwriter::{Color, Format, FormatAlign, FormatBorder, Workbook};
+use rust_xlsxwriter::{Color, Format, FormatAlign, FormatBorder, Workbook, Worksheet, XlsxError};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -36,7 +36,7 @@ impl ProductRow {
     fn overdue_ids_string(&self) -> String {
         self.overdue_ticket_ids
             .iter()
-            .map(|id| id.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ")
     }
@@ -59,9 +59,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             other => return Err(format!("unknown argument: {other}").into()),
         }
     }
-    let (from, to) = match (from, to) {
-        (Some(f), Some(t)) => (f, t),
-        _ => return Err("--from and --to are both required (YYYY-MM-DD)".into()),
+    let (Some(from), Some(to)) = (from, to) else {
+        return Err("--from and --to are both required (YYYY-MM-DD)".into());
     };
     if to < from {
         return Err("--to must not be before --from".into());
@@ -125,7 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let res = client
             .search_tickets(&SearchTicketsQuery::new(q_str))
             .await?;
-        total_by_product.insert(comp.clone(), res.total as u64);
+        total_by_product.insert(comp.clone(), u64::try_from(res.total)?);
     }
     println!("Fetched totals for {} products", total_by_product.len());
 
@@ -141,10 +140,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|comp| {
             let total = total_by_product.get(&comp).copied().unwrap_or(0);
             let ids = overdue_by_product.get(&comp).cloned().unwrap_or_default();
+            let overdue_count = u64::try_from(ids.len()).unwrap_or(u64::MAX);
             ProductRow {
                 product: comp,
-                total_tickets: total.max(ids.len() as u64),
-                total_overdue: ids.len() as u64,
+                total_tickets: total.max(overdue_count),
+                total_overdue: overdue_count,
                 overdue_ticket_ids: ids,
             }
         })
@@ -185,7 +185,7 @@ fn write_excel(
 
     let header_format = Format::new()
         .set_bold()
-        .set_background_color(Color::RGB(0x1F4E78))
+        .set_background_color(Color::RGB(0x001F_4E78))
         .set_font_color(Color::White)
         .set_align(FormatAlign::Center)
         .set_align(FormatAlign::VerticalCenter)
@@ -200,14 +200,14 @@ fn write_excel(
         .set_border(FormatBorder::Thin);
     let rate_label_format = Format::new()
         .set_bold()
-        .set_background_color(Color::RGB(0xD9E1F2))
+        .set_background_color(Color::RGB(0x00D9_E1F2))
         .set_align(FormatAlign::Center)
         .set_align(FormatAlign::VerticalCenter)
         .set_border(FormatBorder::Medium);
     let rate_value_format = Format::new()
         .set_bold()
         .set_font_size(12)
-        .set_background_color(Color::RGB(0xFFF2CC))
+        .set_background_color(Color::RGB(0x00FF_F2CC))
         .set_align(FormatAlign::Center)
         .set_align(FormatAlign::VerticalCenter)
         .set_border(FormatBorder::Medium)
@@ -218,18 +218,15 @@ fn write_excel(
         .set_border(FormatBorder::Thin)
         .set_num_format("0.00%");
 
-    worksheet.write_with_format(0, 0, "In Charge", &header_format)?;
-    worksheet.write_with_format(0, 1, "Product", &header_format)?;
-    worksheet.write_with_format(0, 2, "Total Tickets", &header_format)?;
-    worksheet.write_with_format(0, 3, "Total Overdue Ticket", &header_format)?;
-    worksheet.write_with_format(0, 4, "Overdue Rate", &header_format)?;
-    worksheet.write_with_format(0, 5, "Overdue Tickets", &header_format)?;
+    write_headers(worksheet, &header_format)?;
 
     let in_charge: Option<HashSet<String>> = product_set_from_env("FD_DEFAULT_IN_CHARGE_PRODUCTS");
     let num_products = products.len();
     for (i, p) in products.iter().enumerate() {
-        let row = (i + 1) as u32;
-        let excel_row = row + 1;
+        let row = u32::try_from(i)?
+            .checked_add(1)
+            .ok_or("Too many products")?;
+        let excel_row = row.checked_add(1).ok_or("Too many products")?;
 
         let checked = in_charge
             .as_ref()
@@ -244,7 +241,9 @@ fn write_excel(
     }
 
     let last_row = if num_products > 0 {
-        num_products as u32 + 1
+        u32::try_from(num_products)?
+            .checked_add(1)
+            .ok_or("Too many products")?
     } else {
         2
     };
@@ -286,6 +285,13 @@ fn write_excel(
         &val_fmt,
     )?;
 
+    set_column_widths(worksheet)?;
+
+    workbook.save(path)?;
+    Ok(())
+}
+
+fn set_column_widths(worksheet: &mut Worksheet) -> Result<(), XlsxError> {
     worksheet.set_column_width(0, 12)?;
     worksheet.set_column_width(1, 24)?;
     worksheet.set_column_width(2, 16)?;
@@ -295,7 +301,15 @@ fn write_excel(
     worksheet.set_column_width(6, 4)?;
     worksheet.set_column_width(7, 24)?;
     worksheet.set_column_width(8, 16)?;
+    Ok(())
+}
 
-    workbook.save(path)?;
+fn write_headers(worksheet: &mut Worksheet, format: &Format) -> Result<(), XlsxError> {
+    worksheet.write_with_format(0, 0, "In Charge", format)?;
+    worksheet.write_with_format(0, 1, "Product", format)?;
+    worksheet.write_with_format(0, 2, "Total Tickets", format)?;
+    worksheet.write_with_format(0, 3, "Total Overdue Ticket", format)?;
+    worksheet.write_with_format(0, 4, "Overdue Rate", format)?;
+    worksheet.write_with_format(0, 5, "Overdue Tickets", format)?;
     Ok(())
 }

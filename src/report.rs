@@ -16,30 +16,35 @@ pub struct Quarter {
 
 impl Quarter {
     /// Parse string like "2026Q3", "2026-Q3", "2026q3".
+    ///
+    /// # Errors
+    /// Returns a configuration error if the quarter is malformed or out of range.
     pub fn parse(s: &str) -> Result<Self> {
         let trimmed = s.trim().to_uppercase();
         let cleaned = trimmed.replace('-', "");
 
-        let parts: Vec<&str> = cleaned.split('Q').collect();
-        if parts.len() != 2 {
+        let Some((year, quarter)) = cleaned.split_once('Q') else {
             return Err(FreshdeskError::Configuration(format!(
-                "Invalid quarter format: '{}'. Expected format like '2026Q3'",
-                s
+                "Invalid quarter format: '{s}'. Expected format like '2026Q3'"
+            )));
+        };
+        if quarter.contains('Q') {
+            return Err(FreshdeskError::Configuration(format!(
+                "Invalid quarter format: '{s}'. Expected format like '2026Q3'"
             )));
         }
 
-        let year: i32 = parts[0].parse().map_err(|_| {
-            FreshdeskError::Configuration(format!("Invalid year in quarter '{}'", s))
-        })?;
+        let year: i32 = year
+            .parse()
+            .map_err(|_| FreshdeskError::Configuration(format!("Invalid year in quarter '{s}'")))?;
 
-        let quarter: u8 = parts[1].parse().map_err(|_| {
-            FreshdeskError::Configuration(format!("Invalid quarter number in '{}'", s))
+        let quarter: u8 = quarter.parse().map_err(|_| {
+            FreshdeskError::Configuration(format!("Invalid quarter number in '{s}'"))
         })?;
 
         if !(1..=4).contains(&quarter) {
             return Err(FreshdeskError::Configuration(format!(
-                "Quarter must be between 1 and 4, got {}",
-                quarter
+                "Quarter must be between 1 and 4, got {quarter}"
             )));
         }
 
@@ -47,14 +52,17 @@ impl Quarter {
     }
 
     /// Date bounds for Freshdesk API query.
-    /// Returns (start_day_before, end_day_after) for:
+    /// Returns (`start_day_before`, `end_day_after`) for:
     /// `created_at:>'<start_day_before>' AND created_at:<'<end_day_after>'`.
-    pub fn search_date_bounds(&self) -> (&'static str, &'static str, String, String) {
-        match self.quarter {
+    ///
+    /// # Errors
+    /// Returns a configuration error if the quarter number is outside 1 through 4.
+    pub fn search_date_bounds(&self) -> Result<(&'static str, &'static str, String, String)> {
+        Ok(match self.quarter {
             1 => (
                 "01-01",
                 "03-31",
-                format!("{}-12-31", self.year - 1),
+                format!("{}-12-31", i64::from(self.year).saturating_sub(1)),
                 format!("{}-04-01", self.year),
             ),
             2 => (
@@ -73,12 +81,17 @@ impl Quarter {
                 "10-01",
                 "12-31",
                 format!("{}-09-30", self.year),
-                format!("{}-01-01", self.year + 1),
+                format!("{}-01-01", i64::from(self.year).saturating_add(1)),
             ),
-            _ => unreachable!(),
-        }
+            quarter => {
+                return Err(FreshdeskError::Configuration(format!(
+                    "Quarter must be between 1 and 4, got {quarter}"
+                )));
+            }
+        })
     }
 
+    #[must_use]
     pub fn to_string_code(&self) -> String {
         format!("{}Q{}", self.year, self.quarter)
     }
@@ -87,6 +100,7 @@ impl Quarter {
 /// Parses a comma-separated product list into a lowercased set for
 /// case-insensitive lookup. Returns `None` when the input is empty or
 /// contains only separators.
+#[must_use]
 pub fn parse_product_set(raw: &str) -> Option<HashSet<String>> {
     let set: HashSet<String> = raw
         .split(',')
@@ -98,6 +112,7 @@ pub fn parse_product_set(raw: &str) -> Option<HashSet<String>> {
 
 /// Reads a comma-separated product list from an environment variable.
 /// Returns `None` when the variable is unset, empty, or only separators.
+#[must_use]
 pub fn product_set_from_env(key: &str) -> Option<HashSet<String>> {
     parse_product_set(&std::env::var(key).ok()?)
 }
@@ -107,13 +122,18 @@ pub fn product_set_from_env(key: &str) -> Option<HashSet<String>> {
 /// The set is supplied via the `FD_DEFAULT_IN_CHARGE_PRODUCTS` environment
 /// variable as comma-separated product names. No products are pre-configured
 /// in the code, so this repository ships tenant-agnostic defaults.
+#[must_use]
 pub fn is_default_in_charge(product: &str) -> bool {
     product_set_from_env("FD_DEFAULT_IN_CHARGE_PRODUCTS")
         .is_some_and(|set| set.contains(&product.trim().to_lowercase()))
 }
 
 /// Returns true if the product is in the given in-charge set.
-pub fn is_in_product_set(product: &str, set: &HashSet<String>) -> bool {
+#[must_use]
+pub fn is_in_product_set<S: std::hash::BuildHasher>(
+    product: &str,
+    set: &HashSet<String, S>,
+) -> bool {
     set.contains(&product.trim().to_lowercase())
 }
 
@@ -127,10 +147,11 @@ pub struct ProductQuarterReport {
 }
 
 impl ProductQuarterReport {
+    #[must_use]
     pub fn overdue_ids_string(&self) -> String {
         self.overdue_ticket_ids
             .iter()
-            .map(|id| id.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>()
             .join(", ")
     }
@@ -145,9 +166,12 @@ pub struct QuarterlyReportData {
 
 impl QuarterlyReportData {
     /// Collects report data from Freshdesk for the given quarter.
+    ///
+    /// # Errors
+    /// Returns an error if the quarter is invalid or Freshdesk requests fail.
     pub async fn collect(client: &FreshdeskClient, quarter: Quarter) -> Result<Self> {
         let (_start_label, _end_label, start_day_before, end_day_after) =
-            quarter.search_date_bounds();
+            quarter.search_date_bounds()?;
 
         info!(
             "Collecting quarterly report data for {} ({} to {})...",
@@ -177,9 +201,8 @@ impl QuarterlyReportData {
         // `tests/live_tests.rs` guards that equivalence.
         for page in 1..=10 {
             let overdue_query = format!(
-                "created_at:>'{}' AND created_at:<'{}' \
-                 AND (cf_ttr_overdue:'Yes' AND cf__l3_violated:'Yes')",
-                start_day_before, end_day_after
+                "created_at:>'{start_day_before}' AND created_at:<'{end_day_after}' \
+                 AND (cf_ttr_overdue:'Yes' AND cf__l3_violated:'Yes')"
             );
 
             let search_query = crate::query::SearchTicketsQuery::new(overdue_query).page(page);
@@ -197,7 +220,7 @@ impl QuarterlyReportData {
                 overdue_by_product.entry(comp).or_default().push(t.id);
             }
 
-            if (page * 30) as usize >= total {
+            if usize::try_from(page.saturating_mul(30)).unwrap_or(usize::MAX) >= total {
                 break;
             }
         }
@@ -215,13 +238,15 @@ impl QuarterlyReportData {
             for comp in chunk {
                 let comp_name = comp.clone();
                 let q_str = format!(
-                    "created_at:>'{}' AND created_at:<'{}' AND cf__components:'{}'",
-                    start_day_before, end_day_after, comp_name
+                    "created_at:>'{start_day_before}' AND created_at:<'{end_day_after}' AND cf__components:'{comp_name}'"
                 );
                 let q = crate::query::SearchTicketsQuery::new(q_str);
                 tasks.push(async move {
                     let res = client.search_tickets(&q).await;
-                    (comp_name, res.map(|r| r.total as u64).unwrap_or(0))
+                    (
+                        comp_name,
+                        res.map_or(0, |r| u64::try_from(r.total).unwrap_or(u64::MAX)),
+                    )
                 });
             }
 
@@ -244,7 +269,7 @@ impl QuarterlyReportData {
             .map(|comp| {
                 let total = total_by_product.get(&comp).copied().unwrap_or(0);
                 let overdue_ids = overdue_by_product.get(&comp).cloned().unwrap_or_default();
-                let overdue_count = overdue_ids.len() as u64;
+                let overdue_count = u64::try_from(overdue_ids.len()).unwrap_or(u64::MAX);
 
                 ProductQuarterReport {
                     product: comp,
@@ -269,6 +294,9 @@ impl QuarterlyReportData {
     }
 
     /// Generates the Excel file using `rust_xlsxwriter` according to the requested layout.
+    ///
+    /// # Errors
+    /// Returns an error if the workbook cannot be generated or saved.
     pub fn write_excel(&self, path: &Path) -> Result<()> {
         let mut workbook = Workbook::new();
         let worksheet = workbook.add_worksheet();
@@ -279,7 +307,7 @@ impl QuarterlyReportData {
         // Formatting styles
         let header_format = Format::new()
             .set_bold()
-            .set_background_color(Color::RGB(0x1F4E78)) // Dark blue
+            .set_background_color(Color::RGB(0x001F_4E78)) // Dark blue
             .set_font_color(Color::White)
             .set_align(FormatAlign::Center)
             .set_align(FormatAlign::VerticalCenter)
@@ -295,21 +323,6 @@ impl QuarterlyReportData {
             .set_align(FormatAlign::VerticalCenter)
             .set_border(FormatBorder::Thin);
 
-        let rate_label_format = Format::new()
-            .set_bold()
-            .set_background_color(Color::RGB(0xD9E1F2)) // Light blue accent
-            .set_align(FormatAlign::Center)
-            .set_align(FormatAlign::VerticalCenter)
-            .set_border(FormatBorder::Medium);
-
-        let rate_value_format = Format::new()
-            .set_bold()
-            .set_font_size(12)
-            .set_background_color(Color::RGB(0xFFF2CC)) // Light yellow accent
-            .set_align(FormatAlign::Center)
-            .set_align(FormatAlign::VerticalCenter)
-            .set_border(FormatBorder::Medium)
-            .set_num_format("0.00%");
         let percent_format = Format::new()
             .set_align(FormatAlign::Right)
             .set_align(FormatAlign::VerticalCenter)
@@ -340,10 +353,18 @@ impl QuarterlyReportData {
         // Resolve the in-charge set once (it comes from the environment) rather
         // than re-reading and re-parsing it for every product row.
         let in_charge = product_set_from_env("FD_DEFAULT_IN_CHARGE_PRODUCTS");
-        let num_products = self.products.len();
         for (i, p) in self.products.iter().enumerate() {
-            let row = (i + 1) as u32;
-            let excel_row = row + 1; // 1-indexed for Excel formulas
+            let row = u32::try_from(i)
+                .ok()
+                .and_then(|n| n.checked_add(1))
+                .ok_or_else(|| {
+                    FreshdeskError::Configuration(
+                        "Too many products for an Excel report".to_string(),
+                    )
+                })?;
+            let excel_row = row.checked_add(1).ok_or_else(|| {
+                FreshdeskError::Configuration("Too many products for an Excel report".to_string())
+            })?; // 1-indexed for Excel formulas
 
             // In Charge: Checkbox. Defaults to TRUE only for products in the
             // configured set (FALSE for all others, and for every product when
@@ -381,11 +402,47 @@ impl QuarterlyReportData {
                 .write_with_format(row, 5, p.overdue_ids_string(), &data_format)
                 .map_err(|e| FreshdeskError::Configuration(e.to_string()))?;
         }
+        self.write_summary(worksheet)?;
 
+        // Save workbook
+        workbook.save(path).map_err(|e| {
+            FreshdeskError::Configuration(format!("Failed to save Excel file: {e}"))
+        })?;
+
+        info!(
+            "Successfully generated quarterly report Excel file at {:?}",
+            path
+        );
+        Ok(())
+    }
+
+    fn write_summary(&self, worksheet: &mut rust_xlsxwriter::Worksheet) -> Result<()> {
+        let num_products = self.products.len();
+        let rate_label_format = Format::new()
+            .set_bold()
+            .set_background_color(Color::RGB(0x00D9_E1F2))
+            .set_align(FormatAlign::Center)
+            .set_align(FormatAlign::VerticalCenter)
+            .set_border(FormatBorder::Medium);
+        let rate_value_format = Format::new()
+            .set_bold()
+            .set_font_size(12)
+            .set_background_color(Color::RGB(0x00FF_F2CC))
+            .set_align(FormatAlign::Center)
+            .set_align(FormatAlign::VerticalCenter)
+            .set_border(FormatBorder::Medium)
+            .set_num_format("0.00%");
         // 3. Right-side Overdue Rate calculation
         // Placed in Column H (7) and Column I (8)
         let last_row = if num_products > 0 {
-            num_products as u32 + 1
+            u32::try_from(num_products)
+                .ok()
+                .and_then(|n| n.checked_add(1))
+                .ok_or_else(|| {
+                    FreshdeskError::Configuration(
+                        "Too many products for an Excel report".to_string(),
+                    )
+                })?
         } else {
             2
         };
@@ -464,16 +521,6 @@ impl QuarterlyReportData {
         worksheet
             .set_column_width(8, 16) // Summary value
             .map_err(|e| FreshdeskError::Configuration(e.to_string()))?;
-
-        // Save workbook
-        workbook.save(path).map_err(|e| {
-            FreshdeskError::Configuration(format!("Failed to save Excel file: {}", e))
-        })?;
-
-        info!(
-            "Successfully generated quarterly report Excel file at {:?}",
-            path
-        );
         Ok(())
     }
 }

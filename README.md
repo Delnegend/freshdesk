@@ -4,9 +4,9 @@
 
 **Freshdesk API client and CLI in Rust: tickets, TOTP agent login, quarterly SLA reports.**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Delnegend/freshdesk/ci.yml?branch=main&style=flat-square)](https://github.com/Delnegend/freshdesk/actions)
-[![Release](https://img.shields.io/github/v/release/Delnegend/freshdesk?style=flat-square)](https://github.com/Delnegend/freshdesk/releases)
-[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![CI](https://badgers.space/github/checks/Delnegend/freshdesk/main?corner_radius=0&label=build)](https://github.com/Delnegend/freshdesk/actions)
+[![Release](https://badgers.space/github/release/Delnegend/freshdesk?corner_radius=0&color=ea7233)](https://github.com/Delnegend/freshdesk/releases)
+[![License](https://badgers.space/badge/license/MIT/007ec6?corner_radius=0)](LICENSE)
 
 </div>
 

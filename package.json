@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "playwright": "^1.65.0"
+    "playwright": "^1.65.1"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",
